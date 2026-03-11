@@ -1,0 +1,19 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4F46E5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#3730A3', 'lineColor': '#6366F1', 'secondaryColor': '#E0E7FF', 'tertiaryColor': '#EEF2FF', 'fontFamily': 'Inter, sans-serif'}}}%%
+flowchart TD
+    start["🚀 Start\n<i>receive score</i>"]
+    check{"🔀 If/Else\n<i>score >= 60?</i>"}
+    pass_node["✅ Pass\n<i>Congratulations!</i>"]
+    fail_node["❌ Fail\n<i>Try again</i>"]
+    finish["🏁 End\n<i>return verdict</i>"]
+
+    start --> check
+    check -->|"score >= 60"| pass_node
+    check -->|"else"| fail_node
+    pass_node --> finish
+    fail_node --> finish
+
+    style start fill:#10B981,stroke:#059669,color:#fff
+    style check fill:#F59E0B,stroke:#D97706,color:#fff
+    style pass_node fill:#10B981,stroke:#059669,color:#fff
+    style fail_node fill:#EF4444,stroke:#DC2626,color:#fff
+    style finish fill:#6366F1,stroke:#4338CA,color:#fff

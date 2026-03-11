@@ -1,0 +1,16 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4F46E5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#3730A3', 'lineColor': '#6366F1', 'secondaryColor': '#E0E7FF', 'tertiaryColor': '#EEF2FF', 'fontFamily': 'Inter, sans-serif'}}}%%
+flowchart TD
+    start["🚀 Start\n<i>order request</i>"]
+    calc["⚙️ Calculate\n<i>compute total</i>"]
+    approve["👤 Human Approval\n<i>⏸ PAUSE here</i>"]
+    process["⚙️ Process\n<i>finalize order</i>"]
+    finish["🏁 End\n<i>order confirmed</i>"]
+
+    start --> calc --> approve
+    approve -->|"▶️ resumed"| process --> finish
+
+    style start fill:#10B981,stroke:#059669,color:#fff
+    style calc fill:#4F46E5,stroke:#3730A3,color:#fff
+    style approve fill:#F59E0B,stroke:#D97706,color:#fff,stroke-width:3px,stroke-dasharray: 5 5
+    style process fill:#4F46E5,stroke:#3730A3,color:#fff
+    style finish fill:#EF4444,stroke:#DC2626,color:#fff

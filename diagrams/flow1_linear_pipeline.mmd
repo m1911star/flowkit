@@ -1,0 +1,13 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#4F46E5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#3730A3', 'lineColor': '#6366F1', 'secondaryColor': '#E0E7FF', 'tertiaryColor': '#EEF2FF', 'fontFamily': 'Inter, sans-serif'}}}%%
+flowchart LR
+    start["🚀 Start\n<i>receive inputs</i>"]
+    code1["⚙️ Compute\n<i>a × b + c</i>"]
+    code2["⚙️ Format\n<i>build message</i>"]
+    finish["🏁 End\n<i>return result</i>"]
+
+    start --> code1 --> code2 --> finish
+
+    style start fill:#10B981,stroke:#059669,color:#fff
+    style code1 fill:#4F46E5,stroke:#3730A3,color:#fff
+    style code2 fill:#4F46E5,stroke:#3730A3,color:#fff
+    style finish fill:#EF4444,stroke:#DC2626,color:#fff
