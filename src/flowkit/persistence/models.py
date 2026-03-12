@@ -4,7 +4,6 @@ All 7 tables per the persistence spec: workflows, workflow_versions, workflow_ru
 node_runs, run_events, webhook_triggers, schedule_triggers.
 """
 
-from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy import MetaData

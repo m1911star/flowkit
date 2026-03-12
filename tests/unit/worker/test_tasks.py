@@ -11,7 +11,6 @@ import pytest
 from flowkit.runtime.state import NodeState, RunState
 from flowkit.worker.tasks import execute_workflow_run, resume_workflow_run
 
-
 # Sample workflow definition for testing (minimal valid workflow)
 SIMPLE_WORKFLOW_DEF = {
     "version": "1.0",
@@ -361,7 +360,6 @@ async def test_resume_workflow_run_not_paused():
         patch("flowkit.worker.tasks.get_engine", return_value=mock_engine),
         patch("flowkit.worker.tasks.WorkflowRunRepo", return_value=mock_run_repo),
         patch("flowkit.worker.tasks.RunEventRepo", return_value=mock_event_repo),
+        pytest.raises(ValueError, match="Cannot resume run"),
     ):
-        # Should raise ValueError
-        with pytest.raises(ValueError, match="Cannot resume run"):
-            await resume_workflow_run({}, str(run_id), "end", {})
+        await resume_workflow_run({}, str(run_id), "end", {})

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import signal
 from typing import Any
 
 from flowkit.definition.schema import CodeNodeConfig
@@ -99,9 +98,6 @@ class CodeExecutor(NodeExecutor):
 
         # Extract result from scope
         result_value = scope.get("result")
-        if isinstance(result_value, dict):
-            outputs = result_value
-        else:
-            outputs = {}
+        outputs = result_value if isinstance(result_value, dict) else {}
 
         return NodeResult(status=NodeState.COMPLETED, outputs=outputs)

@@ -13,10 +13,14 @@ Key responsibilities:
 
 from __future__ import annotations
 
-from flowkit.engine.graph import Graph
-from flowkit.nodes.base import NodeResult
+from typing import TYPE_CHECKING
+
 from flowkit.runtime.state import NodeState
-from flowkit.runtime.variable_pool import VariablePool
+
+if TYPE_CHECKING:
+    from flowkit.engine.graph import Graph
+    from flowkit.nodes.base import NodeResult
+    from flowkit.runtime.variable_pool import VariablePool
 
 
 class Dispatcher:

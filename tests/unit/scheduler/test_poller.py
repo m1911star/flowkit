@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from flowkit.persistence.repos import (
     ScheduleTriggerRepo,
@@ -16,6 +16,8 @@ from flowkit.persistence.repos import (
 )
 from flowkit.scheduler.poller import SchedulePoller, compute_next_fire
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
 
 # --------------------------------------------------------------------------- #
 # Fixtures
@@ -72,29 +74,29 @@ async def _seed_workflow_and_version(
 
 class TestComputeNextFire:
     def test_every_minute(self) -> None:
-        after = datetime(2026, 3, 11, 12, 0, 0, tzinfo=timezone.utc)
+        after = datetime(2026, 3, 11, 12, 0, 0, tzinfo=UTC)
         result = compute_next_fire("* * * * *", "UTC", after)
-        assert result == datetime(2026, 3, 11, 12, 1, 0, tzinfo=timezone.utc)
+        assert result == datetime(2026, 3, 11, 12, 1, 0, tzinfo=UTC)
 
     def test_hourly(self) -> None:
-        after = datetime(2026, 3, 11, 12, 30, 0, tzinfo=timezone.utc)
+        after = datetime(2026, 3, 11, 12, 30, 0, tzinfo=UTC)
         result = compute_next_fire("0 * * * *", "UTC", after)
-        assert result == datetime(2026, 3, 11, 13, 0, 0, tzinfo=timezone.utc)
+        assert result == datetime(2026, 3, 11, 13, 0, 0, tzinfo=UTC)
 
     def test_daily_at_midnight(self) -> None:
-        after = datetime(2026, 3, 11, 0, 0, 0, tzinfo=timezone.utc)
+        after = datetime(2026, 3, 11, 0, 0, 0, tzinfo=UTC)
         result = compute_next_fire("0 0 * * *", "UTC", after)
-        assert result == datetime(2026, 3, 12, 0, 0, 0, tzinfo=timezone.utc)
+        assert result == datetime(2026, 3, 12, 0, 0, 0, tzinfo=UTC)
 
     def test_specific_cron(self) -> None:
         # Every weekday at 9:00 AM
-        after = datetime(2026, 3, 11, 9, 0, 0, tzinfo=timezone.utc)  # Wednesday
+        after = datetime(2026, 3, 11, 9, 0, 0, tzinfo=UTC)  # Wednesday
         result = compute_next_fire("0 9 * * 1-5", "UTC", after)
         # Next is Thursday 9:00
-        assert result == datetime(2026, 3, 12, 9, 0, 0, tzinfo=timezone.utc)
+        assert result == datetime(2026, 3, 12, 9, 0, 0, tzinfo=UTC)
 
     def test_result_is_timezone_aware(self) -> None:
-        after = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        after = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
         result = compute_next_fire("0 0 * * *", "UTC", after)
         assert result.tzinfo is not None
 
@@ -115,7 +117,7 @@ class TestSchedulePoller:
         wf_id, ver_id = await _seed_workflow_and_version(conn, workflow_repo, version_repo)
 
         # Create a trigger that's already due
-        past = datetime.now(timezone.utc) - timedelta(minutes=5)
+        past = datetime.now(UTC) - timedelta(minutes=5)
         await schedule_repo.create(
             conn,
             workflow_id=wf_id,
@@ -144,7 +146,7 @@ class TestSchedulePoller:
         schedule_repo, workflow_repo, version_repo, run_repo = repos
         wf_id, ver_id = await _seed_workflow_and_version(conn, workflow_repo, version_repo)
 
-        past = datetime.now(timezone.utc) - timedelta(minutes=1)
+        past = datetime.now(UTC) - timedelta(minutes=1)
         trigger = await schedule_repo.create(
             conn,
             workflow_id=wf_id,
@@ -156,8 +158,9 @@ class TestSchedulePoller:
         await poller.poll_once(conn)
 
         # After firing, next_fire_at should be in the future
-        from flowkit.persistence.models import schedule_triggers
         import sqlalchemy as sa
+
+        from flowkit.persistence.models import schedule_triggers
 
         result = await conn.execute(
             sa.select(schedule_triggers.c.next_fire_at, schedule_triggers.c.last_fired_at).where(
@@ -185,7 +188,7 @@ class TestSchedulePoller:
         wf_id, ver_id = await _seed_workflow_and_version(conn, workflow_repo, version_repo)
 
         # Create a trigger that's NOT due yet
-        future = datetime.now(timezone.utc) + timedelta(hours=1)
+        future = datetime.now(UTC) + timedelta(hours=1)
         await schedule_repo.create(
             conn,
             workflow_id=wf_id,
@@ -205,7 +208,7 @@ class TestSchedulePoller:
     ) -> None:
         schedule_repo, workflow_repo, version_repo, run_repo = repos
 
-        past = datetime.now(timezone.utc) - timedelta(minutes=5)
+        past = datetime.now(UTC) - timedelta(minutes=5)
 
         # Create two workflows with due triggers
         wf_id1, _ = await _seed_workflow_and_version(conn, workflow_repo, version_repo)

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from flowkit.definition.schema import LoopConfig
 from flowkit.nodes.base import NodeContext, NodeExecutor, NodeResult
 from flowkit.runtime.state import NodeState

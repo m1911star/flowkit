@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
@@ -26,15 +25,17 @@ from flowkit.persistence.repos import (
 from flowkit.runtime.state import NodeState
 from flowkit.runtime.variable_pool import VariablePool
 from flowkit.streaming.emitter import (
-    EventEmitter,
     NODE_COMPLETED,
     NODE_FAILED,
     NODE_STARTED,
     NODE_WAITING,
     RUN_COMPLETED,
     RUN_STARTED,
+    EventEmitter,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 # --------------------------------------------------------------------------- #
 # Engine / Connection fixtures

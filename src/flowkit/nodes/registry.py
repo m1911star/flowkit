@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from flowkit.definition.schema import NodeType
-from flowkit.nodes.base import NodeExecutor
 from flowkit.nodes.code import CodeExecutor
 from flowkit.nodes.end import EndExecutor
 from flowkit.nodes.http import HttpExecutor
@@ -11,6 +12,9 @@ from flowkit.nodes.human_input import HumanInputExecutor
 from flowkit.nodes.if_else import IfElseExecutor
 from flowkit.nodes.loop import LoopExecutor
 from flowkit.nodes.start import StartExecutor
+
+if TYPE_CHECKING:
+    from flowkit.nodes.base import NodeExecutor
 
 EXECUTOR_REGISTRY: dict[NodeType, type[NodeExecutor]] = {
     NodeType.start: StartExecutor,

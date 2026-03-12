@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from flowkit.definition.schema import (
+    DataType,
     EdgeDef,
     InputDef,
-    DataType,
     NodeDef,
     NodeType,
     OutputDef,
@@ -1579,7 +1579,9 @@ class TestSpecExampleValidation:
                         "conditions": [
                             {
                                 "id": "is_high",
-                                "expression": "{{nodes.fetch_order.output.body.priority}} == 'high'",
+                                "expression": (
+                                    "{{nodes.fetch_order.output.body.priority}} == 'high'"
+                                ),
                             },
                         ],
                     },
@@ -1602,7 +1604,8 @@ class TestSpecExampleValidation:
                     label="Auto Approve",
                     config={
                         "language": "python",
-                        "source": "return {'approved': True, 'comment': 'Auto-approved (normal priority)'}",
+                        "source": "return {'approved': True,"
+                        " 'comment': 'Auto-approved (normal priority)'}",
                         "inputs": {},
                     },
                 ),

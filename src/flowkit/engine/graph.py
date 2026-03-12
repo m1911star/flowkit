@@ -57,14 +57,16 @@ class Graph:
     def find_ready_nodes(self, completed_nodes: set[str]) -> list[str]:
         """Find nodes whose ALL predecessors are completed and aren't completed themselves."""
         ready = []
-        for node_id, node_def in self._nodes.items():
+        for node_id, _node_def in self._nodes.items():
             if node_id in completed_nodes:
                 continue
 
             predecessors = self.get_predecessors(node_id)
-            if not predecessors and node_id not in completed_nodes:
-                ready.append(node_id)
-            elif all(p in completed_nodes for p in predecessors):
+            if (
+                not predecessors
+                and node_id not in completed_nodes
+                or all(p in completed_nodes for p in predecessors)
+            ):
                 ready.append(node_id)
 
         return ready

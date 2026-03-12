@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-from sqlalchemy.ext.asyncio import AsyncConnection
+from typing import TYPE_CHECKING
 
 from flowkit.persistence.repos import RunEventRepo
-from flowkit.streaming.emitter import EventEmitter, NODE_COMPLETED, NODE_STARTED, RUN_STARTED
+from flowkit.streaming.emitter import NODE_COMPLETED, NODE_STARTED, RUN_STARTED, EventEmitter
 from flowkit.streaming.sse import format_sse_event, sse_event_stream
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
 
 # --------------------------------------------------------------------------- #
 # format_sse_event

@@ -7,11 +7,10 @@ as first argument for transaction control by the caller.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from flowkit.persistence.models import (
     node_runs,
@@ -23,9 +22,12 @@ from flowkit.persistence.models import (
     workflows,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
+
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # --------------------------------------------------------------------------- #
@@ -431,7 +433,8 @@ class RunEventRepo:
                 run_events.c.workflow_run_id == workflow_run_id
             )
         )
-        return result.scalar_one()
+        value: int = result.scalar_one()
+        return value
 
 
 # --------------------------------------------------------------------------- #

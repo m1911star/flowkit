@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from flowkit.persistence.repos import (
     NodeRunRepo,
@@ -17,6 +17,9 @@ from flowkit.persistence.repos import (
     WorkflowRunRepo,
     WorkflowVersionRepo,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
 
 
 # --------------------------------------------------------------------------- #
@@ -480,7 +483,7 @@ class TestScheduleTriggerRepo:
         conn: AsyncConnection,
         workflow_id: uuid.UUID,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         trigger = await repo.create(
             conn,
             workflow_id=workflow_id,
@@ -496,8 +499,8 @@ class TestScheduleTriggerRepo:
         conn: AsyncConnection,
         workflow_id: uuid.UUID,
     ) -> None:
-        past = datetime.now(timezone.utc) - timedelta(minutes=5)
-        future = datetime.now(timezone.utc) + timedelta(hours=1)
+        past = datetime.now(UTC) - timedelta(minutes=5)
+        future = datetime.now(UTC) + timedelta(hours=1)
         await repo.create(
             conn,
             workflow_id=workflow_id,
@@ -510,7 +513,7 @@ class TestScheduleTriggerRepo:
             cron_expression="0 0 * * *",
             next_fire_at=future,
         )
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         due = await repo.get_due_triggers(conn, now)
         assert len(due) == 1
         assert due[0]["cron_expression"] == "0 * * * *"
@@ -521,7 +524,7 @@ class TestScheduleTriggerRepo:
         conn: AsyncConnection,
         workflow_id: uuid.UUID,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         trigger = await repo.create(
             conn,
             workflow_id=workflow_id,

@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_en
 
 from flowkit.config import Settings
 
-
 _engine: AsyncEngine | None = None
 
 

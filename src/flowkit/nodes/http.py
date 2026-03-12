@@ -52,7 +52,7 @@ class HttpExecutor(NodeExecutor):
                     status=NodeState.COMPLETED,
                     outputs=self._parse_response(response),
                 )
-            except (httpx.HTTPError, asyncio.TimeoutError) as exc:
+            except (TimeoutError, httpx.HTTPError) as exc:
                 last_error = str(exc)
                 if attempt < max_attempts - 1:
                     # Simple backoff: fixed = no wait in tests, exponential = 2^attempt

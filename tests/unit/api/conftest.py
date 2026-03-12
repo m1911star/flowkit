@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-from typing import Any
-from unittest.mock import AsyncMock
+from typing import TYPE_CHECKING
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -13,6 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_en
 from flowkit.api.app import create_app
 from flowkit.api.deps import get_db_connection
 from flowkit.persistence.models import metadata
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @pytest.fixture

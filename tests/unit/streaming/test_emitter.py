@@ -4,28 +4,22 @@ from __future__ import annotations
 
 import json
 import uuid
-from unittest.mock import AsyncMock, MagicMock
-
-import pytest
-from sqlalchemy.ext.asyncio import AsyncConnection
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
 
 from flowkit.persistence.repos import RunEventRepo
 from flowkit.streaming.emitter import (
     ALL_EVENT_TYPES,
     NODE_COMPLETED,
-    NODE_FAILED,
-    NODE_RESUMED,
     NODE_STARTED,
-    NODE_WAITING,
-    RUN_CANCELLED,
     RUN_COMPLETED,
     RUN_FAILED,
-    RUN_PAUSED,
-    RUN_RESUMED,
     RUN_STARTED,
     EventEmitter,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
 
 # --------------------------------------------------------------------------- #
 # Helpers
@@ -147,4 +141,4 @@ class TestEventTypeConstants:
             "node_waiting",
             "node_resumed",
         }
-        assert ALL_EVENT_TYPES == expected
+        assert expected == ALL_EVENT_TYPES

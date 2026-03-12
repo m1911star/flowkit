@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from flowkit.persistence.repos import (
     WebhookTriggerRepo,
@@ -21,6 +21,8 @@ from flowkit.triggers.webhook import (
     _resolve_path,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
 
 # --------------------------------------------------------------------------- #
 # Fixtures

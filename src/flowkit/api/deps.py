@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from flowkit.persistence.database import get_engine
 from flowkit.persistence.repos import (

@@ -5,15 +5,14 @@ This module is pure Python with zero external dependencies.
 
 from __future__ import annotations
 
-from enum import Enum
-
+from enum import StrEnum
 
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
 
 
-class RunState(str, Enum):
+class RunState(StrEnum):
     """Lifecycle states for a workflow run."""
 
     PENDING = "pending"
@@ -24,7 +23,7 @@ class RunState(str, Enum):
     CANCELLED = "cancelled"
 
 
-class NodeState(str, Enum):
+class NodeState(StrEnum):
     """Lifecycle states for a single node execution within a run."""
 
     PENDING = "pending"

@@ -6,8 +6,8 @@ Pydantic v2 models for workflow definitions, nodes, edges, and per-node configs.
 from __future__ import annotations
 
 import re
-from enum import Enum
-from typing import Any, Union, cast
+from enum import StrEnum
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -19,7 +19,7 @@ NODE_ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
 WORKFLOW_NAME_PATTERN = re.compile(r"^[a-z0-9-]+$")
 
 
-class DataType(str, Enum):
+class DataType(StrEnum):
     """Supported variable types in DSL v1."""
 
     string = "string"
@@ -30,7 +30,7 @@ class DataType(str, Enum):
     any = "any"
 
 
-class NodeType(str, Enum):
+class NodeType(StrEnum):
     """Supported node types in DSL v1 MVP."""
 
     start = "start"
@@ -42,7 +42,7 @@ class NodeType(str, Enum):
     human_input = "human_input"
 
 
-class HttpMethod(str, Enum):
+class HttpMethod(StrEnum):
     """HTTP methods supported by the http node."""
 
     GET = "GET"
@@ -52,7 +52,7 @@ class HttpMethod(str, Enum):
     DELETE = "DELETE"
 
 
-class BackoffStrategy(str, Enum):
+class BackoffStrategy(StrEnum):
     """Retry backoff strategies."""
 
     fixed = "fixed"
@@ -235,14 +235,8 @@ class NodeDef(BaseModel):
             return None
         result = model_cls.model_validate(self.config)
         return cast(
-            Union[
-                HttpNodeConfig,
-                CodeNodeConfig,
-                IfElseConfig,
-                LoopConfig,
-                HumanInputConfig,
-                EndNodeConfig,
-            ],
+            "HttpNodeConfig | CodeNodeConfig | IfElseConfig | LoopConfig | "
+            "HumanInputConfig | EndNodeConfig",
             result,
         )
 

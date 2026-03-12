@@ -3,7 +3,7 @@
 import uuid
 
 from flowkit.definition.schema import NodeDef, NodeType
-from flowkit.nodes.base import NodeContext, NodeResult
+from flowkit.nodes.base import NodeContext
 from flowkit.nodes.start import StartExecutor
 from flowkit.runtime.state import NodeState
 from flowkit.runtime.variable_pool import VariablePool

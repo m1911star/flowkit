@@ -108,9 +108,9 @@ async def create_version(
 
     # Validate DSL definition
     try:
-        definition = load_dict(body.definition)
+        load_dict(body.definition)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Invalid workflow definition: {e}")
+        raise HTTPException(status_code=422, detail=f"Invalid workflow definition: {e}") from e
 
     # Compute version number
     latest = await ver_repo.get_latest(conn, workflow_id)

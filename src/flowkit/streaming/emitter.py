@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+if TYPE_CHECKING:
+    import uuid
 
-from flowkit.persistence.repos import RunEventRepo
+    from sqlalchemy.ext.asyncio import AsyncConnection
+
+    from flowkit.persistence.repos import RunEventRepo
 
 logger = logging.getLogger(__name__)
 

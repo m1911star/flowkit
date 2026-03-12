@@ -12,7 +12,7 @@ from typing import Any
 
 from flowkit.definition.loader import load_dict
 from flowkit.engine.graph import Graph
-from flowkit.nodes.base import NodeContext, NodeResult
+from flowkit.nodes.base import NodeContext
 from flowkit.nodes.registry import get_executor
 from flowkit.persistence.database import get_engine
 from flowkit.persistence.repos import (
@@ -259,7 +259,8 @@ async def resume_workflow_run(
             # Validate run is paused
             if run["status"] != RunState.PAUSED.value:
                 raise ValueError(
-                    f"Cannot resume run {run_id}: status is {run['status']}, expected {RunState.PAUSED.value}"
+                    f"Cannot resume run {run_id}: status is {run['status']}, "
+                    f"expected {RunState.PAUSED.value}"
                 )
 
             # Load workflow version

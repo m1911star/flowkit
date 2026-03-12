@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass, field
-from typing import Any, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
-from flowkit.definition.schema import WorkflowDefinition
-from flowkit.nodes.base import NodeResult
+if TYPE_CHECKING:
+    import uuid
+
+    from flowkit.definition.schema import WorkflowDefinition
+    from flowkit.nodes.base import NodeResult
 
 
 @dataclass
@@ -41,10 +43,6 @@ class CancelRunCommand:
     run_id: uuid.UUID
 
 
-Command = Union[
-    StartRunCommand,
-    CompleteNodeCommand,
-    PauseRunCommand,
-    ResumeRunCommand,
-    CancelRunCommand,
-]
+Command = (
+    StartRunCommand | CompleteNodeCommand | PauseRunCommand | ResumeRunCommand | CancelRunCommand
+)

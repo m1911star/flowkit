@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from sqlalchemy.ext.asyncio import AsyncConnection
+from typing import TYPE_CHECKING, Any
 
 from tests.integration.conftest import (
-    ExecutionResult,
     Repos,
     create_workflow_and_version,
     execute_workflow,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
 
 # --------------------------------------------------------------------------- #
 # DSL definitions

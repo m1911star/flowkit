@@ -1,6 +1,5 @@
 """Tests for configuration module."""
 
-import os
 
 from flowkit.config import Settings, get_settings
 

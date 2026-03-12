@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
 from flowkit.persistence.database import dispose_engine, get_engine
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @asynccontextmanager
@@ -30,9 +33,9 @@ def create_app() -> FastAPI:
     )
 
     # Import and include routers
-    from flowkit.api.routes.workflows import router as workflows_router
     from flowkit.api.routes.runs import router as runs_router
     from flowkit.api.routes.triggers import router as triggers_router
+    from flowkit.api.routes.workflows import router as workflows_router
 
     app.include_router(workflows_router, prefix="/api/v1")
     app.include_router(runs_router, prefix="/api/v1")

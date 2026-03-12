@@ -21,9 +21,7 @@ from flowkit.definition.schema import (
     CodeNodeConfig,
     DataType,
     HttpNodeConfig,
-    HumanInputConfig,
     IfElseConfig,
-    LoopConfig,
     NodeDef,
     NodeType,
     WorkflowDefinition,
@@ -341,11 +339,14 @@ def validate(definition: WorkflowDefinition) -> list[ValidationError]:
         in_degree: dict[str, int] = {nid: 0 for nid in node_ids}
         adj: dict[str, list[str]] = defaultdict(list)
         for edge in definition.edges:
-            if edge.source in node_ids and edge.target in node_ids:
+            if (
+                edge.source in node_ids
+                and edge.target in node_ids
                 # Skip self-loops for DAG check
-                if edge.source != edge.target:
-                    adj[edge.source].append(edge.target)
-                    in_degree[edge.target] = in_degree.get(edge.target, 0) + 1
+                and edge.source != edge.target
+            ):
+                adj[edge.source].append(edge.target)
+                in_degree[edge.target] = in_degree.get(edge.target, 0) + 1
 
         queue: deque[str] = deque()
         for nid in node_ids:
@@ -582,14 +583,17 @@ def validate(definition: WorkflowDefinition) -> list[ValidationError]:
     # V-025: enum values must match declared type
     # -----------------------------------------------------------------------
     for name, inp in definition.inputs.items():
-        if inp.enum is not None:
-            if inp.type not in (DataType.string, DataType.number, DataType.any):
-                errors.append(
-                    ValidationError(
-                        code="V-025",
-                        message=f"Input '{name}' enum is only allowed for string/number types",
-                    )
+        if inp.enum is not None and inp.type not in (
+            DataType.string,
+            DataType.number,
+            DataType.any,
+        ):
+            errors.append(
+                ValidationError(
+                    code="V-025",
+                    message=f"Input '{name}' enum is only allowed for string/number types",
                 )
+            )
 
     # -----------------------------------------------------------------------
     # V-026: orphan node — every node must have at least one edge

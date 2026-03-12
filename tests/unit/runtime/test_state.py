@@ -3,17 +3,16 @@
 import pytest
 
 from flowkit.runtime.state import (
+    VALID_NODE_TRANSITIONS,
+    VALID_RUN_TRANSITIONS,
     InvalidTransitionError,
     NodeState,
     RunState,
-    VALID_NODE_TRANSITIONS,
-    VALID_RUN_TRANSITIONS,
     transition_node,
     transition_run,
     validate_node_transition,
     validate_run_transition,
 )
-
 
 # ---------------------------------------------------------------------------
 # RunState enum

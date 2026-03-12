@@ -436,7 +436,9 @@ class TestSpecExample:
                         "conditions": [
                             {
                                 "id": "is_high",
-                                "expression": "{{nodes.fetch_order.output.body.priority}} == 'high'",
+                                "expression": (
+                                    "{{nodes.fetch_order.output.body.priority}} == 'high'"
+                                ),
                             }
                         ]
                     },
@@ -459,7 +461,8 @@ class TestSpecExample:
                     "label": "Auto Approve",
                     "config": {
                         "language": "python",
-                        "source": "return {'approved': True, 'comment': 'Auto-approved (normal priority)'}",
+                        "source": "return {'approved': True,"
+                        " 'comment': 'Auto-approved (normal priority)'}",
                         "inputs": {},
                     },
                 },

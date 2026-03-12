@@ -9,18 +9,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from croniter import croniter
-from sqlalchemy.ext.asyncio import AsyncConnection
 
-from flowkit.persistence.repos import (
-    ScheduleTriggerRepo,
-    WorkflowRunRepo,
-    WorkflowVersionRepo,
-)
+if TYPE_CHECKING:
+    import uuid
+
+    from sqlalchemy.ext.asyncio import AsyncConnection
+
+    from flowkit.persistence.repos import (
+        ScheduleTriggerRepo,
+        WorkflowRunRepo,
+        WorkflowVersionRepo,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +49,7 @@ def compute_next_fire(
     next_dt: datetime = cron.get_next(datetime)
     # Ensure the result is timezone-aware (UTC)
     if next_dt.tzinfo is None:
-        next_dt = next_dt.replace(tzinfo=timezone.utc)
+        next_dt = next_dt.replace(tzinfo=UTC)
     return next_dt
 
 
@@ -75,7 +78,7 @@ class SchedulePoller:
 
         Returns the list of created ``workflow_run`` IDs.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         due_triggers = await self._schedule_repo.get_due_triggers(conn, now)
 
         created_run_ids: list[uuid.UUID] = []
@@ -148,4 +151,5 @@ class SchedulePoller:
             next_fire_at=next_fire,
         )
 
-        return run["id"]
+        run_id: uuid.UUID = run["id"]
+        return run_id

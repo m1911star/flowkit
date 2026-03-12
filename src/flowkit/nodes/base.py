@@ -5,14 +5,16 @@ These form the contract that every node type implements.
 
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from flowkit.definition.schema import NodeDef
-from flowkit.runtime.state import NodeState
-from flowkit.runtime.variable_pool import VariablePool
+if TYPE_CHECKING:
+    import uuid
+
+    from flowkit.definition.schema import NodeDef
+    from flowkit.runtime.state import NodeState
+    from flowkit.runtime.variable_pool import VariablePool
 
 
 @dataclass

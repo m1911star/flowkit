@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from sqlalchemy.ext.asyncio import AsyncConnection
+from typing import TYPE_CHECKING, Any
 
 from tests.integration.conftest import (
-    ExecutionResult,
     Repos,
     create_workflow_and_version,
     execute_workflow,
     resume_workflow,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
 
 # --------------------------------------------------------------------------- #
 # DSL definitions
@@ -51,7 +50,9 @@ def _human_input_definition() -> dict[str, Any]:
                 "type": "code",
                 "config": {
                     "language": "python",
-                    "source": 'result = {"status": "approved" if approved else "rejected", "note": note}',
+                    "source": (
+                        'result = {"status": "approved" if approved else "rejected", "note": note}'
+                    ),
                     "inputs": {
                         "approved": "{{nodes.human_input_1.output.approved}}",
                         "note": "{{nodes.human_input_1.output.note}}",

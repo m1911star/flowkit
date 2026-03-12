@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from flowkit.triggers.webhook import (
     WebhookHandler,
@@ -17,6 +16,8 @@ from tests.integration.conftest import (
     create_workflow_and_version,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection
 
 # --------------------------------------------------------------------------- #
 # DSL definition (minimal — webhook just creates the run)

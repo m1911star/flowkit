@@ -6,15 +6,17 @@ Build graph → find ready nodes → execute each → dispatch results → repea
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from flowkit.definition.schema import WorkflowDefinition
 from flowkit.engine.dispatcher import Dispatcher
 from flowkit.engine.graph import Graph
 from flowkit.nodes.base import NodeContext
 from flowkit.nodes.registry import get_executor
 from flowkit.runtime.state import NodeState, RunState
 from flowkit.runtime.variable_pool import VariablePool
+
+if TYPE_CHECKING:
+    from flowkit.definition.schema import WorkflowDefinition
 
 _MAX_ITERATIONS = 1000
 

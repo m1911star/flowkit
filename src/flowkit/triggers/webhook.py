@@ -6,17 +6,19 @@ and creates a new workflow run.
 
 from __future__ import annotations
 
-import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+if TYPE_CHECKING:
+    import uuid
 
-from flowkit.persistence.repos import (
-    WebhookTriggerRepo,
-    WorkflowRepo,
-    WorkflowRunRepo,
-    WorkflowVersionRepo,
-)
+    from sqlalchemy.ext.asyncio import AsyncConnection
+
+    from flowkit.persistence.repos import (
+        WebhookTriggerRepo,
+        WorkflowRepo,
+        WorkflowRunRepo,
+        WorkflowVersionRepo,
+    )
 
 
 # --------------------------------------------------------------------------- #
