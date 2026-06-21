@@ -1,6 +1,7 @@
 """Tests for flowkit.nodes.parallel — ParallelExecutor."""
 
 import uuid
+from typing import Any
 
 from flowkit.definition.schema import NodeDef, NodeType
 from flowkit.nodes.base import NodeContext
@@ -10,9 +11,13 @@ from flowkit.runtime.variable_pool import VariablePool
 
 
 def _make_ctx(
-    items_ref: str, pool: VariablePool, *, config: dict | None = None, **config_overrides
+    items_ref: str,
+    pool: VariablePool,
+    *,
+    config: dict[str, Any] | None = None,
+    **config_overrides: Any,
 ) -> NodeContext:
-    cfg = config if config is not None else {
+    cfg: dict[str, Any] = config if config is not None else {
         "items": items_ref,
         "item_variable": config_overrides.get("item_variable", "item"),
         "index_variable": config_overrides.get("index_variable", "index"),
@@ -27,7 +32,7 @@ def _make_ctx(
 
 
 class TestParallelExecutor:
-    async def test_resolves_items_and_outputs(self):
+    async def test_resolves_items_and_outputs(self) -> None:
         pool = VariablePool()
         pool.set_node_outputs("fetch", {"orders": [1, 2, 3]})
 
@@ -40,7 +45,7 @@ class TestParallelExecutor:
         assert result.next_handle == "body"
         assert result.outputs["count"] == 3
 
-    async def test_empty_items_returns_completed(self):
+    async def test_empty_items_returns_completed(self) -> None:
         pool = VariablePool()
         pool.set_node_outputs("fetch", {"orders": []})
 
@@ -54,7 +59,7 @@ class TestParallelExecutor:
         assert result.outputs["count"] == 0
         assert result.outputs["results"] == []
 
-    async def test_non_list_fails(self):
+    async def test_non_list_fails(self) -> None:
         pool = VariablePool()
         pool.set_node_outputs("fetch", {"data": "not_a_list"})
 
@@ -67,7 +72,7 @@ class TestParallelExecutor:
         assert result.error is not None
         assert "str" in result.error
 
-    async def test_stores_first_item_in_pool(self):
+    async def test_stores_first_item_in_pool(self) -> None:
         pool = VariablePool()
         pool.set_node_outputs("fetch", {"items": ["a", "b", "c"]})
 
@@ -85,7 +90,7 @@ class TestParallelExecutor:
         assert node_outputs["_items"] == ["a", "b", "c"]
         assert node_outputs["_total"] == 3
 
-    async def test_invalid_config(self):
+    async def test_invalid_config(self) -> None:
         pool = VariablePool()
         ctx = NodeContext(
             node_def=NodeDef(id="parallel_node", type=NodeType.parallel, config=None),

@@ -13,6 +13,7 @@ from flowkit.nodes.loop import LoopExecutor
 from flowkit.nodes.parallel import ParallelExecutor
 from flowkit.nodes.registry import EXECUTOR_REGISTRY, get_executor
 from flowkit.nodes.start import StartExecutor
+from flowkit.nodes.sub_workflow import SubWorkflowExecutor
 
 
 class TestExecutorRegistry:
@@ -29,6 +30,7 @@ class TestExecutorRegistry:
         assert EXECUTOR_REGISTRY[NodeType.loop] is LoopExecutor
         assert EXECUTOR_REGISTRY[NodeType.human_input] is HumanInputExecutor
         assert EXECUTOR_REGISTRY[NodeType.parallel] is ParallelExecutor
+        assert EXECUTOR_REGISTRY[NodeType.sub_workflow] is SubWorkflowExecutor
 
     def test_get_executor_returns_instance(self):
         for node_type in NodeType:

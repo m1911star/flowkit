@@ -13,6 +13,7 @@ from flowkit.nodes.if_else import IfElseExecutor
 from flowkit.nodes.loop import LoopExecutor
 from flowkit.nodes.parallel import ParallelExecutor
 from flowkit.nodes.start import StartExecutor
+from flowkit.nodes.sub_workflow import SubWorkflowExecutor
 
 if TYPE_CHECKING:
     from flowkit.nodes.base import NodeExecutor
@@ -26,6 +27,7 @@ EXECUTOR_REGISTRY: dict[NodeType, type[NodeExecutor]] = {
     NodeType.loop: LoopExecutor,
     NodeType.parallel: ParallelExecutor,
     NodeType.human_input: HumanInputExecutor,
+    NodeType.sub_workflow: SubWorkflowExecutor,
 }
 
 

@@ -80,6 +80,7 @@ class TestNodeType:
             NodeType.loop,
             NodeType.human_input,
             NodeType.parallel,
+            NodeType.sub_workflow,
         }
 
 

@@ -41,6 +41,7 @@ class NodeType(StrEnum):
     loop = "loop"
     human_input = "human_input"
     parallel = "parallel"
+    sub_workflow = "sub_workflow"
 
 
 class HttpMethod(StrEnum):
@@ -167,6 +168,21 @@ class ParallelConfig(BaseModel):
     index_variable: str = "index"
     max_concurrency: int = Field(default=10, ge=1)
 
+
+class SubWorkflowConfig(BaseModel):
+    """Config for 'sub_workflow' node type.
+
+    Embeds a child workflow definition inline. The child is executed
+    as a nested workflow. Its outputs become this node's outputs.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    definition: dict[str, Any]  # Raw workflow definition (validated at execution time)
+    input_mapping: dict[str, str] = Field(default_factory=dict)
+    # Maps: child_input_name -> variable reference in parent pool
+    # e.g. {"order_id": "{{nodes.fetch_order.order_id}}"}
+
 class HumanInputConfig(BaseModel):
     """Config for 'human_input' node type."""
 
@@ -231,6 +247,7 @@ class NodeDef(BaseModel):
         | IfElseConfig
         | LoopConfig
         | ParallelConfig
+        | SubWorkflowConfig
         | HumanInputConfig
         | EndNodeConfig
         | None
@@ -245,6 +262,7 @@ class NodeDef(BaseModel):
             NodeType.if_else: IfElseConfig,
             NodeType.loop: LoopConfig,
             NodeType.parallel: ParallelConfig,
+            NodeType.sub_workflow: SubWorkflowConfig,
             NodeType.human_input: HumanInputConfig,
             NodeType.end: EndNodeConfig,
         }
@@ -254,7 +272,7 @@ class NodeDef(BaseModel):
         result = model_cls.model_validate(self.config)
         return cast(
             "HttpNodeConfig | CodeNodeConfig | IfElseConfig | LoopConfig | "
-            "ParallelConfig | HumanInputConfig | EndNodeConfig",
+            "ParallelConfig | SubWorkflowConfig | HumanInputConfig | EndNodeConfig",
             result,
         )
 
