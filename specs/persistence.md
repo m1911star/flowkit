@@ -1,6 +1,6 @@
 # Flowkit Persistence Schema
 
-> Status: **Draft v1** · Date: 2026-03-11
+> Status: **v2** · Last updated: 2026-06-21
 
 ## 1. Overview
 
@@ -21,6 +21,7 @@ All Flowkit runtime state is persisted in PostgreSQL. This document defines the 
 ```
 workflows 1──∞ workflow_versions 1──∞ workflow_runs 1──∞ node_runs
                                   1──∞ run_events
+                                  1──∞ dead_letter_queue
 workflows 1──∞ webhook_triggers
 workflows 1──∞ schedule_triggers
 ```
@@ -289,6 +290,43 @@ WHERE id = :id;
 
 ---
 
+### 3.8 `dead_letter_queue`
+
+Stores unrecoverable execution failures for later inspection and retry.
+
+```sql
+CREATE TABLE dead_letter_queue (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workflow_run_id UUID NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
+    error           TEXT NOT NULL,
+    node_id         VARCHAR(100),
+    attempt         INTEGER NOT NULL DEFAULT 1,
+    max_retries     INTEGER NOT NULL DEFAULT 3,
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+    retried_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ix_dead_letter_queue_status ON dead_letter_queue (status);
+CREATE INDEX ix_dead_letter_queue_workflow_run_id ON dead_letter_queue (workflow_run_id);
+```
+
+**Status values:** `pending`, `retrying`, `resolved`, `failed`
+
+**Operations (via `DeadLetterRepo`):**
+
+| Operation | Description |
+|-----------|-------------|
+| `create(run_id, error, node_id)` | Record a new dead-letter entry |
+| `retry(entry_id)` | Increment attempt, set status to `retrying`, re-enqueue node |
+| `resolve(entry_id)` | Mark entry as `resolved` after successful retry |
+| `list_by_run(run_id)` | List all dead-letter entries for a run |
+| `list_pending()` | List all pending/retrying entries (for watchdog) |
+
+**When max_retries exceeded:** Status becomes `failed`. Entry remains for audit. Manual intervention required.
+
+---
+
 ## 4. Indexes Summary
 
 | Table | Index | Purpose |
@@ -307,6 +345,8 @@ WHERE id = :id;
 | `run_events` | `(event_type)` | Filter by event type |
 | `webhook_triggers` | `(key) WHERE active` | Webhook lookup |
 | `schedule_triggers` | `(next_fire_at) WHERE active` | Scheduler polling |
+| `dead_letter_queue` | `(status)` | Find pending/retrying entries |
+| `dead_letter_queue` | `(workflow_run_id)` | List entries per run |
 
 ---
 
@@ -409,7 +449,7 @@ No automatic cleanup. All data retained.
 
 ### Initial Migration
 
-The tables defined in this spec constitute migration `001_initial_schema`. All tables are created in a single migration with proper foreign key ordering.
+The tables defined in this spec constitute migration `001_initial_schema` plus `002_dead_letter_queue`. All 8 tables are created over two migrations with proper foreign key ordering.
 
 ### Schema Evolution Rules
 

@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" />
   <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white" />
   <img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white" />
-  <img src="https://img.shields.io/badge/tests-510%20passed-brightgreen?style=flat-square" />
+  <img src="https://img.shields.io/badge/tests-609%20passed-brightgreen?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" />
 </p>
 
@@ -27,13 +27,16 @@
 
 Flowkit is an open-source, headless workflow backend — a standalone engine for defining, validating, executing, and managing workflows via API. It handles:
 
-- **Workflow Definition** — JSON-based DSL with graph validation
-- **Execution Engine** — DAG-based dispatcher with topological ordering
-- **State Persistence** — Full run/node-run records in PostgreSQL
+- **Workflow Definition** — JSON-based DSL with graph validation (10 node types)
+- **Execution Engine** — DAG-based dispatcher with topological ordering + parallel fan-out
+- **State Persistence** — Full run/node-run records in PostgreSQL + dead-letter queue
 - **Pause / Resume / Cancel** — First-class support via human-input nodes
-- **Event Streaming** — Real-time SSE events for every state transition
+- **Event Streaming** — Real-time SSE + WebSocket events for every state transition
 - **Triggers** — Webhook and cron-based schedule triggers
 - **Async Workers** — Arq-powered background execution with Redis
+- **Plugin Model** — Custom node types via plugin interface with entry-point discovery
+- **Sub-Workflows** — Nested workflow composition (workflow-as-node)
+- **Error Hierarchy** — Structured errors with machine-readable codes + dead-letter tracking
 
 > Think of it as the execution layer you'd rip out of Dify, N8N, or Prefect — but decoupled from any product UI.
 
@@ -44,7 +47,8 @@ Flowkit is an open-source, headless workflow backend — a standalone engine for
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        API Layer (FastAPI)                   │
-│  /workflows  /runs  /triggers  /events(SSE)                 │
+│  /workflows  /runs  /triggers  /events(SSE)  /ws(WS)       │
+│  ↕ Auth: X-API-Key middleware                                │
 └──────────┬────────────────────────────────┬─────────────────┘
            │                                │
            ▼                                ▼
@@ -58,35 +62,42 @@ Flowkit is an open-source, headless workflow backend — a standalone engine for
 │                     Engine Core                              │
 │  ┌──────────┐  ┌────────────┐  ┌────────────┐              │
 │  │ Graph    │  │ Dispatcher │  │ Executor   │              │
-│  │ Builder  │  │ (topo-sort)│  │ (per-node) │              │
+│  │ Builder  │  │ (topo-sort)│  │ (parallel) │              │
+│  └──────────┘  └────────────┘  └────────────┘              │
+│  ┌──────────┐  ┌────────────┐  ┌────────────┐              │
+│  │ Variable │  │ Run State  │  │ Error      │              │
+│  │ Pool     │  │ Machine    │  │ Hierarchy  │              │
 │  └──────────┘  └────────────┘  └────────────┘              │
 │  ┌──────────┐  ┌────────────┐                               │
-│  │ Variable │  │ Run State  │                               │
-│  │ Pool     │  │ Machine    │                               │
+│  │ Plugin   │  │ Sub-Wkfl   │                               │
+│  │ Adapter  │  │ Executor   │                               │
 │  └──────────┘  └────────────┘                               │
 └──────────┬──────────────────────────────────────────────────┘
            │
            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │               Persistence (SQLAlchemy Core)                  │
-│  workflows │ workflow_versions │ runs │ node_runs            │
-│  triggers  │ schedules        │ events                       │
+│  workflows │ versions │ runs │ node_runs │ events            │
+│  webhook_triggers │ schedule_triggers │ dead_letter_queue   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Node Types (MVP)
+## Node Types (10 types)
 
 | Node | Purpose | Key Behavior |
 |------|---------|-------------|
 | `start` | Entry point | Injects initial variables into the run |
 | `end` | Terminal node | Collects final outputs |
-| `code` | Inline Python | Sandboxed `exec()` with variable pool |
-| `http` | HTTP request | Async `httpx` call with templated URL/body |
+| `code` | Inline Python | AST-validated sandbox with daemon-thread timeout |
+| `http` | HTTP request | Async `httpx` with jitter backoff + retry |
 | `if_else` | Conditional branch | Evaluates expression → routes to branch |
-| `loop` | Iteration | Repeats body nodes N times or until condition |
+| `loop` | Iteration | Repeats body nodes N times (max_iterations guard) |
 | `human_input` | Pause & wait | Suspends run, resumes on external signal |
+| `parallel` | Fan-out | Concurrent branches over collection items |
+| `sub_workflow` | Nested workflow | Executes child workflow definition inline |
+| `plugin` | Custom node | User-registered via PluginNodeExecutor ABC |
 
 ---
 
@@ -366,7 +377,7 @@ uv run pytest tests/ -v
 ```
 
 ```
-510 passed in 2.23s
+609 passed in 3.40s
 ```
 
 ### Run Demo
@@ -378,9 +389,11 @@ uv run python demo_workflows.py
 ### Start the Server
 
 ```bash
-# Set environment variables (or use .env)
-export DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/flowkit"
-export REDIS_URL="redis://localhost:6379"
+# Set environment variables (or use .env) — all use FLOWKIT_ prefix
+export FLOWKIT_DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/flowkit"
+export FLOWKIT_REDIS_URL="redis://localhost:6379"
+# Optional: API key auth
+export FLOWKIT_API_KEY="your-secret-key"
 
 uv run uvicorn flowkit.api.app:create_app --factory --reload
 ```
@@ -392,11 +405,16 @@ uv run uvicorn flowkit.api.app:create_app --factory --reload
 | `POST` | `/workflows` | Create a workflow |
 | `GET` | `/workflows` | List workflows |
 | `GET` | `/workflows/{id}` | Get workflow detail |
+| `POST` | `/workflows/{id}/versions` | Publish a new version |
+| `GET` | `/workflows/{id}/versions` | List all versions |
+| `POST` | `/workflows/{id}/versions/{vid}/rollback` | Rollback to a version |
+| `GET` | `/workflows/{id}/versions/diff` | Diff two versions |
 | `POST` | `/workflows/{id}/runs` | Start a run |
 | `GET` | `/runs/{id}` | Get run status |
 | `POST` | `/runs/{id}/resume` | Resume paused run |
 | `POST` | `/runs/{id}/cancel` | Cancel running run |
 | `GET` | `/runs/{id}/events` | SSE event stream |
+| `WS`  | `/ws/runs/{run_id}` | WebSocket bidirectional stream |
 | `POST` | `/triggers/webhook` | Create webhook trigger |
 | `POST` | `/triggers/schedule` | Create schedule trigger |
 
@@ -406,23 +424,25 @@ uv run uvicorn flowkit.api.app:create_app --factory --reload
 
 ```
 src/flowkit/
-├── api/                  # FastAPI routes, schemas, dependencies
+├── api/                  # FastAPI routes, schemas, deps, middleware
 │   ├── routes/           # workflows, runs, triggers
-│   └── schemas/          # request/response models
+│   └── schemas/          # request/response models + error schemas
 ├── definition/           # DSL schema, validation, loader
-├── engine/               # Graph builder, dispatcher, executor
-├── nodes/                # Node implementations (7 types)
-├── persistence/          # SQLAlchemy models, repos, database
+├── engine/               # Graph builder, dispatcher, executor (parallel + sequential)
+├── nodes/                # Node implementations (10 types)
+├── plugins/              # PluginNodeExecutor ABC, registry, adapter, loader
+├── persistence/          # SQLAlchemy models (8 tables), repos, database
 ├── runtime/              # Variable pool, run state machine
 ├── scheduler/            # Cron-based polling scheduler
-├── streaming/            # SSE event emitter
+├── streaming/            # SSE emitter + WebSocket connection manager
 ├── triggers/             # Webhook handler
-├── worker/               # Arq async task runner
-└── config.py             # Pydantic settings
+├── worker/               # Arq async task runner + lifecycle hooks
+├── config.py             # Pydantic settings (FLOWKIT_ prefix)
+└── errors.py             # Structured error hierarchy
 
 tests/
-├── unit/                 # 474 unit tests across all modules
-└── integration/          # 36 integration tests (full engine runs)
+├── unit/                 # Unit tests across all modules
+└── integration/          # Integration tests (full engine runs)
 ```
 
 ---
@@ -435,27 +455,30 @@ tests/
 | Database | PostgreSQL (asyncpg) + SQLAlchemy Core |
 | Queue | Redis + Arq |
 | Migrations | Alembic |
-| Validation | Pydantic v2 |
+| Validation | Pydantic v2 + pydantic-settings |
 | HTTP Client | httpx (async) |
-| Streaming | sse-starlette |
+| Streaming | sse-starlette + WebSocket (starlette) |
 | Scheduling | croniter + DB polling |
-| Testing | pytest + pytest-asyncio + aiosqlite |
+| Plugins | importlib.metadata entry points |
+| Testing | pytest + pytest-asyncio + aiosqlite + testcontainers |
 | Linting | Ruff + mypy (strict) |
 
 ---
 
 ## Configuration
 
-All settings via environment variables or `.env` file:
+All settings via environment variables with `FLOWKIT_` prefix:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `sqlite+aiosqlite:///./flowkit.db` | Database connection string |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection for Arq |
-| `API_HOST` | `0.0.0.0` | API bind host |
-| `API_PORT` | `8000` | API bind port |
-| `LOG_LEVEL` | `info` | Logging level |
-| `SCHEDULER_POLL_SECONDS` | `10` | Cron scheduler poll interval |
+| `FLOWKIT_DATABASE_URL` | `postgresql+asyncpg://...` | Database connection string |
+| `FLOWKIT_REDIS_URL` | `redis://localhost:6379` | Redis connection for Arq |
+| `FLOWKIT_API_HOST` | `0.0.0.0` | API bind host |
+| `FLOWKIT_API_PORT` | `8000` | API bind port |
+| `FLOWKIT_API_KEY` | `""` | API key for X-API-Key auth (empty = disabled) |
+| `FLOWKIT_LOG_LEVEL` | `INFO` | Logging level |
+| `FLOWKIT_WORKER_CONCURRENCY` | `10` | Max concurrent node executions per worker |
+| `FLOWKIT_SCHEDULER_POLL_INTERVAL` | `15` | Cron scheduler poll interval (seconds) |
 
 ---
 

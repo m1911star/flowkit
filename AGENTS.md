@@ -4,14 +4,14 @@
 
 Flowkit is a headless workflow backend service — define, validate, execute, pause/resume, and stream workflows via API. No UI, no vendor lock-in.
 
-**Status: MVP Complete** — all functionality implemented and tested (510 tests).
+**Status: Phase 2 Complete** — 609 tests, ruff clean, mypy clean.
 
 ## Stack
 
 - Python 3.12, FastAPI (factory: `flowkit.api.app:create_app`), Uvicorn
 - SQLAlchemy Core (no ORM), asyncpg, aiosqlite (tests)
 - Redis, Arq (worker queue)
-- Pydantic v2 + pydantic-settings, Alembic, croniter, httpx, sse-starlette
+- Pydantic v2 + pydantic-settings, Alembic, croniter, httpx, sse-starlette, websockets
 - pytest, pytest-asyncio, pytest-cov, testcontainers (integration tests)
 - ruff (py312, line-length=100), mypy (strict + pydantic plugin)
 - Package manager: uv
@@ -54,35 +54,38 @@ uv run alembic upgrade head
 API (FastAPI) → Worker (Arq) → Engine → Persistence (PostgreSQL)
                                   ↕
                               Scheduler (DB poller)
-                              Streaming (SSE)
+                              Streaming (SSE + WebSocket)
 ```
 
 ## Project Structure
 
 ```
 src/flowkit/
-├── api/            # FastAPI routes, schemas, deps
+├── api/            # FastAPI routes, schemas, deps, middleware
 ├── definition/     # DSL schema, validator, loader
 ├── engine/         # Graph, dispatcher, executor, commands
-├── nodes/          # 7 node types + base + registry
-├── persistence/    # Models, repos, database
+├── nodes/          # 10 node types + base + registry
+├── persistence/    # Models (8 tables), repos, database
+├── plugins/        # PluginNodeExecutor ABC, registry, adapter, loader
 ├── runtime/        # Variable pool, state machine
 ├── scheduler/      # DB-polling cron scheduler
-├── streaming/      # SSE event emitter
+├── streaming/      # SSE emitter + WebSocket connection manager
 ├── triggers/       # Webhook handler
-├── worker/         # Arq task runner
-└── config.py       # Pydantic settings (FLOWKIT_ prefix)
+├── worker/         # Arq task runner + lifecycle hooks
+├── config.py       # Pydantic settings (FLOWKIT_ prefix)
+└── errors.py       # Structured error hierarchy (FlowkitError + 6 subclasses)
 ```
 
 ## Node Types
 
-start, end, http, code, if_else, loop, human_input
+start, end, http, code, if_else, loop, human_input, parallel, sub_workflow, plugin
 
 ## Conventions
 
 - **SQLAlchemy Core only** — no ORM, explicit SQL
 - **Keyword-only repo args** — `repo.method(conn, *, key=value)` pattern
 - **Separate API models** — API schemas ≠ internal engine models
+- **Error hierarchy** — all errors inherit from `FlowkitError` with machine-readable `code` and `details`
 - **Tests**: aiosqlite in-memory, `asyncio_mode=auto`, `testpaths=tests`, `pythonpath=src`
 - **Linting**: ruff (py312, line-length=100), mypy strict with pydantic plugin
 - **Package manager**: uv
@@ -101,7 +104,7 @@ start, end, http, code, if_else, loop, human_input
 
 - `specs/architecture.md` — System architecture, service topology, module responsibilities
 - `specs/dsl-v1.md` — Workflow DSL v1 schema, node types, 32 validation rules
-- `specs/persistence.md` — Database schema, 7 tables, index strategy
+- `specs/persistence.md` — Database schema, 8 tables, index strategy
 
 ## Key Decisions
 

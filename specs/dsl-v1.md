@@ -1,6 +1,6 @@
 # Flowkit DSL v1 Specification
 
-> Status: **Draft v1** · Date: 2026-03-11
+> Status: **v2** · Last updated: 2026-06-21
 
 ## 1. Overview
 
@@ -152,7 +152,7 @@ identifier    = [a-zA-Z_][a-zA-Z0-9_]*
 
 ---
 
-## 6. Node Type Catalog (MVP)
+## 6. Node Type Catalog (v2 — 10 node types)
 
 ### 6.1 `start`
 
@@ -364,6 +364,115 @@ Pauses execution and waits for external human input via the API.
 
 **Outputs:** The submitted input data. Keys match `input_schema` field names.
 
+### 6.8 `parallel`
+
+Fans out over a collection, executing a sub-path for each item concurrently.
+
+**Config:**
+
+```json
+{
+  "items": "{{nodes.fetch.output.orders}}",
+  "item_variable": "current_order",
+  "index_variable": "loop_index",
+  "max_concurrency": 10
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `items` | string | ✓ | | Variable reference resolving to an array. |
+| `item_variable` | string | | `"item"` | Variable name for the current item in each branch. |
+| `index_variable` | string | | `"index"` | Variable name for the current index in each branch. |
+| `max_concurrency` | number | | `10` | Maximum concurrent fan-out branches. |
+
+**Execution model:**
+- Resolves `items` to a list from the variable pool.
+- For each item, creates an independent execution branch (structural fan-out).
+- All branches run concurrently up to `max_concurrency` limit.
+- Fail-fast: first `FAILED` branch aborts remaining branches.
+- `WAITING` (human_input) nodes within branches defer fan-out completion.
+- When all branches complete, results are collected.
+
+**Outputs:**
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `results` | array | Collected outputs from each branch's terminal node. |
+| `count` | number | Number of items processed. |
+
+**Edge handles:** `body` (sub-path), `completed` (after all branches finish).
+
+### 6.9 `sub_workflow`
+
+Embeds and executes a child workflow definition as a nested sub-workflow.
+
+**Config:**
+
+```json
+{
+  "definition": {
+    "version": "1.0",
+    "metadata": { "name": "child-process" },
+    "nodes": [ ... ],
+    "edges": [ ... ]
+  },
+  "input_mapping": {
+    "order_id": "{{nodes.fetch_order.output.order_id}}",
+    "priority": "{{workflow.input.priority}}"
+  }
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `definition` | object | ✓ | | Full DSL v1 workflow definition (inline). |
+| `input_mapping` | object | | `{}` | Maps child workflow input names to variable references in the parent pool. |
+
+**Execution model:**
+1. Child definition is validated at execution time via `load_dict()`.
+2. `input_mapping` keys become the child workflow's inputs, values resolved from parent pool.
+3. Child workflow executes synchronously within the parent's process (`WorkflowExecutor.execute_workflow()`).
+4. Status mapping:
+   - Child `COMPLETED` → parent node `completed`, child outputs become node outputs
+   - Child `PAUSED` (human_input) → parent node `waiting` (parent pauses too)
+   - Child `FAILED` → parent node `failed`
+5. No DB records created for child run (runs in-process).
+
+**Outputs:** The child workflow's final outputs (from its `end` node).
+
+### 6.10 `plugin`
+
+Executes a custom node type registered via the plugin system.
+
+**Config:**
+
+```json
+{
+  "type": "slack_notification",
+  "channel": "#alerts",
+  "message": "Order {{workflow.input.order_id}} requires approval",
+  "inputs": {
+    "order_data": "{{nodes.fetch_order.output.body}}"
+  }
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `type` | string | ✓ | | Plugin node type identifier (must be registered in `PluginRegistry`). |
+| *(other)* | any | | | All other fields are plugin-specific — validated against the plugin's `config_schema` at execution time. |
+
+**Execution model:**
+1. `PluginNodeAdapter` looks up the plugin by `type` in the global `PluginRegistry`.
+2. If the plugin provides a `config_schema`, it is validated against via `model_validate()`.
+3. Plugin's `execute(config, inputs, context)` is called with resolved inputs.
+4. Result is mapped: `"completed"`→completed, `"failed"`→failed, `"waiting"`→waiting.
+
+**Outputs:** Dict returned by the plugin — keys are plugin-defined.
+
+**Discovery:** Plugins are discovered via `importlib.metadata` entry points in the `flowkit.plugins` group. Each entry point returns a `(PluginMetadata, PluginNodeExecutor class, optional config_schema)` tuple.
+
 ---
 
 ## 7. Edge Definition
@@ -399,6 +508,9 @@ Most nodes have a single `"default"` output handle. Special cases:
 | `if_else` | One per condition `id` + `else` |
 | `loop` | `body` (sub-path), `completed` (after loop) |
 | `human_input` | `default` |
+| `parallel` | `body` (sub-path), `completed` (after all) |
+| `sub_workflow` | `default` |
+| `plugin` | `default` |
 
 ---
 

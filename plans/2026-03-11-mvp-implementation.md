@@ -1,12 +1,13 @@
-# MVP Implementation Plan
+# MVP → Phase 2 Implementation Plan
 
-> **Status: ✅ ALL PHASES COMPLETE** — 510 tests passing, 2.23s
+> **Status: ✅ ALL PHASES COMPLETE** — 609 tests passing, 3.40s
 
 ## Goal
 
-Implement Flowkit MVP: a headless workflow backend with DSL v1, graph validation,
+Implemented Flowkit MVP + Phase 2: headless workflow backend with DSL v1, graph validation,
 execution engine, persistence, webhook/schedule triggers, pause/resume/cancel,
-and SSE event streaming. Full test coverage on all modules.
+SSE + WebSocket streaming, plugin model, parallel execution, sub-workflow composition,
+structured error hierarchy, dead-letter queue, API auth. Full test coverage on all modules.
 
 ## Architecture
 

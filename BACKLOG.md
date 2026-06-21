@@ -25,27 +25,32 @@
 - [x] 510 tests (474 unit + 36 integration)
 - [x] Demo workflows (3 flows with Mermaid diagrams + execution output)
 
-## Active (Phase 2)
+## Completed (Phase 2)
 
-- [ ] Error handling hardening — retry policies, dead-letter tracking
-- [ ] HTTP node: response schema validation, timeout configuration
-- [ ] Code node: sandbox hardening (restricted builtins, resource limits)
-- [ ] Loop node: break conditions, max iteration guards
-- [ ] Workflow versioning API (publish, rollback, diff)
-- [ ] Run log / audit trail API
-- [ ] Bulk operations (batch cancel, batch retry)
-- [ ] Metrics / observability (structured logging, Prometheus counters)
-- [ ] OpenAPI spec generation + API docs polish
+- [x] Structured error hierarchy — `FlowkitError` base + 6 subclasses (`NotFoundError`, `ValidationError`, `ExecutionError`, `TimeoutError`, `WebhookError`, `StateTransitionError`)
+- [x] Global exception handler with status code mapping in API
+- [x] Code node sandbox — AST pre-validation, daemon-thread timeout, source size limit
+- [x] Loop node — `max_iterations` enforcement (default 100)
+- [x] HTTP node — jitter backoff, 10MB response limit, 4xx/5xx retry
+- [x] Structured logging across engine, nodes, triggers, persistence
+- [x] Scheduler graceful shutdown via `asyncio.Event`
+- [x] Worker lifecycle hooks (`on_startup`/`on_shutdown`)
+- [x] Dead-letter queue table + `DeadLetterRepo` (create/retry/resolve)
+- [x] API key auth middleware (`X-API-Key`, configurable, disabled by default)
+- [x] OpenAPI error response annotations on all routes
+- [x] Workflow versioning — rollback + diff endpoints
+- [x] Parallel execution — `asyncio.gather()` for multiple ready nodes
+- [x] New `parallel` node type — fan-out over collections with `max_concurrency`
+- [x] New `sub_workflow` node type — nested workflow composition with `input_mapping`
+- [x] WebSocket streaming — `/ws/runs/{run_id}` endpoint with bidirectional messaging
+- [x] Plugin model — `PluginNodeExecutor` ABC, `PluginRegistry`, `PluginNodeAdapter`, entry point discovery
+- [x] 609 tests passing, ruff clean, mypy clean
 
-## Backlog (Phase 3+)
+## Active (Phase 3)
 
-- [ ] Plugin model for custom node types
-- [ ] Parallel execution (fan-out / fan-in)
-- [ ] Sub-workflow node (workflow-as-node composition)
 - [ ] Template variables + secrets management
 - [ ] Multi-tenancy (workspace isolation)
 - [ ] Distributed scheduler (multi-instance leader election)
-- [ ] WebSocket transport option for event streaming
 - [ ] SDK (Python client library)
 - [ ] CLI tool for workflow management
 
