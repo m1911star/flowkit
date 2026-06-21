@@ -11,6 +11,7 @@ from flowkit.nodes.http import HttpExecutor
 from flowkit.nodes.human_input import HumanInputExecutor
 from flowkit.nodes.if_else import IfElseExecutor
 from flowkit.nodes.loop import LoopExecutor
+from flowkit.nodes.parallel import ParallelExecutor
 from flowkit.nodes.start import StartExecutor
 
 if TYPE_CHECKING:
@@ -23,6 +24,7 @@ EXECUTOR_REGISTRY: dict[NodeType, type[NodeExecutor]] = {
     NodeType.code: CodeExecutor,
     NodeType.if_else: IfElseExecutor,
     NodeType.loop: LoopExecutor,
+    NodeType.parallel: ParallelExecutor,
     NodeType.human_input: HumanInputExecutor,
 }
 

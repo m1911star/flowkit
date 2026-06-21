@@ -10,6 +10,7 @@ from flowkit.nodes.http import HttpExecutor
 from flowkit.nodes.human_input import HumanInputExecutor
 from flowkit.nodes.if_else import IfElseExecutor
 from flowkit.nodes.loop import LoopExecutor
+from flowkit.nodes.parallel import ParallelExecutor
 from flowkit.nodes.registry import EXECUTOR_REGISTRY, get_executor
 from flowkit.nodes.start import StartExecutor
 
@@ -27,6 +28,7 @@ class TestExecutorRegistry:
         assert EXECUTOR_REGISTRY[NodeType.if_else] is IfElseExecutor
         assert EXECUTOR_REGISTRY[NodeType.loop] is LoopExecutor
         assert EXECUTOR_REGISTRY[NodeType.human_input] is HumanInputExecutor
+        assert EXECUTOR_REGISTRY[NodeType.parallel] is ParallelExecutor
 
     def test_get_executor_returns_instance(self):
         for node_type in NodeType:

@@ -40,6 +40,7 @@ class NodeType(StrEnum):
     if_else = "if_else"
     loop = "loop"
     human_input = "human_input"
+    parallel = "parallel"
 
 
 class HttpMethod(StrEnum):
@@ -151,6 +152,21 @@ class LoopConfig(BaseModel):
     max_iterations: int = Field(default=100, ge=1)
 
 
+
+class ParallelConfig(BaseModel):
+    """Config for 'parallel' node type.
+
+    Resolves items from variable pool, fans out to body branch
+    for each item. Results collected when all complete.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: str  # Variable reference to resolve (same as loop)
+    item_variable: str = "item"
+    index_variable: str = "index"
+    max_concurrency: int = Field(default=10, ge=1)
+
 class HumanInputConfig(BaseModel):
     """Config for 'human_input' node type."""
 
@@ -214,6 +230,7 @@ class NodeDef(BaseModel):
         | CodeNodeConfig
         | IfElseConfig
         | LoopConfig
+        | ParallelConfig
         | HumanInputConfig
         | EndNodeConfig
         | None
@@ -227,6 +244,7 @@ class NodeDef(BaseModel):
             NodeType.code: CodeNodeConfig,
             NodeType.if_else: IfElseConfig,
             NodeType.loop: LoopConfig,
+            NodeType.parallel: ParallelConfig,
             NodeType.human_input: HumanInputConfig,
             NodeType.end: EndNodeConfig,
         }
@@ -236,7 +254,7 @@ class NodeDef(BaseModel):
         result = model_cls.model_validate(self.config)
         return cast(
             "HttpNodeConfig | CodeNodeConfig | IfElseConfig | LoopConfig | "
-            "HumanInputConfig | EndNodeConfig",
+            "ParallelConfig | HumanInputConfig | EndNodeConfig",
             result,
         )
 

@@ -5,6 +5,7 @@ Build graph → find ready nodes → execute each → dispatch results → repea
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from flowkit.engine.dispatcher import Dispatcher
 from flowkit.engine.graph import Graph
-from flowkit.nodes.base import NodeContext
+from flowkit.nodes.base import NodeContext, NodeResult
 from flowkit.nodes.registry import get_executor
 from flowkit.runtime.state import NodeState, RunState
 from flowkit.runtime.variable_pool import VariablePool
@@ -60,18 +61,22 @@ class WorkflowExecutor:
             if not ready:
                 break
 
-            for node_id in ready:
-                node_def = graph.get_node(node_id)
-                executor = get_executor(node_def.type)
-
+            async def _execute_node(nid: str) -> tuple[str, NodeResult]:
+                node_def = graph.get_node(nid)
+                node_executor = get_executor(node_def.type)
                 ctx = NodeContext(
                     node_def=node_def,
                     variable_pool=pool,
                     run_id=run_id,
                     node_run_id=uuid.uuid4(),
                 )
+                res = await node_executor.execute(ctx)
+                return (nid, res)
 
-                result = await executor.execute(ctx)
+            results = await asyncio.gather(*[_execute_node(nid) for nid in ready])
+
+            # Process results sequentially (dispatcher is not thread-safe)
+            for node_id, result in results:
                 logger.debug("Node %s executed, status=%s", node_id, result.status.value)
                 _ = dispatcher.on_node_complete(node_id, result)
 
@@ -79,15 +84,6 @@ class WorkflowExecutor:
                     events.append({"type": "node_completed", "node_id": node_id})
                 elif result.status == NodeState.WAITING:
                     events.append({"type": "node_waiting", "node_id": node_id})
-                    logger.info("Workflow paused, run_id=%s", run_id)
-                    return WorkflowResult(
-                        status=RunState.PAUSED,
-                        run_id=run_id,
-                        outputs={},
-                        events=events,
-                        waiting_node=node_id,
-                        error=None,
-                    )
                 elif result.status == NodeState.FAILED:
                     events.append({"type": "node_failed", "node_id": node_id})
                     logger.info(
@@ -101,6 +97,19 @@ class WorkflowExecutor:
                         waiting_node=None,
                         error=f"Node '{node_id}' failed: {result.error}",
                     )
+
+            # After processing all results: check if any was waiting
+            waiting_nodes = [nid for nid, res in results if res.status == NodeState.WAITING]
+            if waiting_nodes:
+                logger.info("Workflow paused, run_id=%s", run_id)
+                return WorkflowResult(
+                    status=RunState.PAUSED,
+                    run_id=run_id,
+                    outputs={},
+                    events=events,
+                    waiting_node=waiting_nodes[0],
+                    error=None,
+                )
 
         end_node = graph.get_end_node()
         end_outputs = (

@@ -354,3 +354,135 @@ class TestWorkflowExecutorHttp:
             )
             assert result.status == RunState.COMPLETED
             assert result.outputs["status"] == 200
+
+
+# ---------------------------------------------------------------------------
+# Parallel execution: start -> fork -> [code_a, code_b] -> end
+# ---------------------------------------------------------------------------
+
+
+def _parallel_diamond_workflow() -> WorkflowDefinition:
+    """Diamond: start → fork → [code_a, code_b] → end."""
+    return _make_definition(
+        nodes=[
+            NodeDef(id="start", type=NodeType.start),
+            NodeDef(
+                id="fork",
+                type=NodeType.code,
+                config={
+                    "language": "python",
+                    "source": 'result = {"forked": True}',
+                    "inputs": {},
+                },
+            ),
+            NodeDef(
+                id="code_a",
+                type=NodeType.code,
+                config={
+                    "language": "python",
+                    "source": 'result = {"a": 1}',
+                    "inputs": {},
+                },
+            ),
+            NodeDef(
+                id="code_b",
+                type=NodeType.code,
+                config={
+                    "language": "python",
+                    "source": 'result = {"b": 2}',
+                    "inputs": {},
+                },
+            ),
+            NodeDef(
+                id="end",
+                type=NodeType.end,
+                config={
+                    "output_mapping": {
+                        "a": "{{nodes.code_a.output.a}}",
+                        "b": "{{nodes.code_b.output.b}}",
+                    },
+                },
+            ),
+        ],
+        edges=[
+            EdgeDef(id="e1", source="start", target="fork"),
+            EdgeDef(id="e2", source="fork", target="code_a"),
+            EdgeDef(id="e3", source="fork", target="code_b"),
+            EdgeDef(id="e4", source="code_a", target="end"),
+            EdgeDef(id="e5", source="code_b", target="end"),
+        ],
+    )
+
+
+def _parallel_diamond_with_failure() -> WorkflowDefinition:
+    """Diamond where code_b raises an error."""
+    return _make_definition(
+        nodes=[
+            NodeDef(id="start", type=NodeType.start),
+            NodeDef(
+                id="fork",
+                type=NodeType.code,
+                config={
+                    "language": "python",
+                    "source": 'result = {"forked": True}',
+                    "inputs": {},
+                },
+            ),
+            NodeDef(
+                id="code_a",
+                type=NodeType.code,
+                config={
+                    "language": "python",
+                    "source": 'result = {"a": 1}',
+                    "inputs": {},
+                },
+            ),
+            NodeDef(
+                id="code_b",
+                type=NodeType.code,
+                config={
+                    "language": "python",
+                    "source": "raise ValueError('boom')",
+                    "inputs": {},
+                },
+            ),
+            NodeDef(
+                id="end",
+                type=NodeType.end,
+                config={"output_mapping": {}},
+            ),
+        ],
+        edges=[
+            EdgeDef(id="e1", source="start", target="fork"),
+            EdgeDef(id="e2", source="fork", target="code_a"),
+            EdgeDef(id="e3", source="fork", target="code_b"),
+            EdgeDef(id="e4", source="code_a", target="end"),
+            EdgeDef(id="e5", source="code_b", target="end"),
+        ],
+    )
+
+
+class TestWorkflowExecutorParallel:
+    """Parallel branches execute concurrently via asyncio.gather."""
+
+    async def test_parallel_branches_both_execute(self) -> None:
+        executor = WorkflowExecutor()
+        result = await executor.execute_workflow(
+            _parallel_diamond_workflow(),
+            inputs={},
+        )
+
+        assert result.status == RunState.COMPLETED
+        assert result.outputs["a"] == 1
+        assert result.outputs["b"] == 2
+
+    async def test_parallel_branch_failure_fails_workflow(self) -> None:
+        executor = WorkflowExecutor()
+        result = await executor.execute_workflow(
+            _parallel_diamond_with_failure(),
+            inputs={},
+        )
+
+        assert result.status == RunState.FAILED
+        assert result.error is not None
+        assert "code_b" in result.error

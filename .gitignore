@@ -33,3 +33,4 @@ artifacts/
 research/
 scratch/
 .coverage
+reasonix.toml

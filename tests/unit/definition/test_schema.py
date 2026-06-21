@@ -79,6 +79,7 @@ class TestNodeType:
             NodeType.if_else,
             NodeType.loop,
             NodeType.human_input,
+            NodeType.parallel,
         }
 
 
