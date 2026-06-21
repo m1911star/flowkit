@@ -15,10 +15,12 @@ from flowkit.api.deps import (
     get_version_repo,
     get_workflow_repo,
 )
+from flowkit.api.schemas.errors import ErrorResponse
 from flowkit.api.schemas.workflows import (
     CreateVersionRequest,
     CreateWorkflowRequest,
     UpdateWorkflowRequest,
+    VersionDiffResponse,
     WorkflowListResponse,
     WorkflowResponse,
     WorkflowVersionResponse,
@@ -49,7 +51,11 @@ async def list_workflows(
     return {"items": items, "total": len(items)}
 
 
-@router.get("/{workflow_id}", response_model=WorkflowResponse)
+@router.get(
+    "/{workflow_id}",
+    response_model=WorkflowResponse,
+    responses={404: {"model": ErrorResponse}},
+)
 async def get_workflow(
     workflow_id: UUID,
     conn: Annotated[AsyncConnection, Depends(get_db_connection)],
@@ -61,7 +67,11 @@ async def get_workflow(
     return wf
 
 
-@router.patch("/{workflow_id}", response_model=WorkflowResponse)
+@router.patch(
+    "/{workflow_id}",
+    response_model=WorkflowResponse,
+    responses={404: {"model": ErrorResponse}},
+)
 async def update_workflow(
     workflow_id: UUID,
     body: UpdateWorkflowRequest,
@@ -79,7 +89,7 @@ async def update_workflow(
     return wf
 
 
-@router.delete("/{workflow_id}", status_code=204)
+@router.delete("/{workflow_id}", status_code=204, responses={404: {"model": ErrorResponse}})
 async def delete_workflow(
     workflow_id: UUID,
     conn: Annotated[AsyncConnection, Depends(get_db_connection)],
@@ -93,7 +103,12 @@ async def delete_workflow(
 # --- Versions ---
 
 
-@router.post("/{workflow_id}/versions", response_model=WorkflowVersionResponse, status_code=201)
+@router.post(
+    "/{workflow_id}/versions",
+    response_model=WorkflowVersionResponse,
+    status_code=201,
+    responses={404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+)
 async def create_version(
     workflow_id: UUID,
     body: CreateVersionRequest,
@@ -149,6 +164,73 @@ async def publish_version(
     ver = await ver_repo.get(conn, version_id)
     if ver is None or ver["workflow_id"] != workflow_id:
         raise HTTPException(status_code=404, detail="Version not found")
+    # Unpublish any currently published version first
+    await ver_repo.unpublish_all(conn, workflow_id)
     await ver_repo.publish(conn, version_id)
     ver["is_published"] = True
     return ver
+
+
+@router.post(
+    "/{workflow_id}/versions/{version_id}/rollback", response_model=WorkflowVersionResponse
+)
+async def rollback_version(
+    workflow_id: UUID,
+    version_id: UUID,
+    conn: Annotated[AsyncConnection, Depends(get_db_connection)],
+    ver_repo: Annotated[WorkflowVersionRepo, Depends(get_version_repo)],
+) -> dict[str, Any]:
+    """Rollback: unpublish current and publish the specified version."""
+    ver = await ver_repo.get(conn, version_id)
+    if ver is None or ver["workflow_id"] != workflow_id:
+        raise HTTPException(status_code=404, detail="Version not found")
+    await ver_repo.unpublish_all(conn, workflow_id)
+    await ver_repo.publish(conn, version_id)
+    ver["is_published"] = True
+    return ver
+
+
+@router.get("/{workflow_id}/versions/diff", response_model=VersionDiffResponse)
+async def diff_versions(
+    workflow_id: UUID,
+    from_version: int,
+    to_version: int,
+    conn: Annotated[AsyncConnection, Depends(get_db_connection)],
+    ver_repo: Annotated[WorkflowVersionRepo, Depends(get_version_repo)],
+) -> dict[str, Any]:
+    """Compare two workflow versions and return structural differences."""
+    ver_from = await ver_repo.get_by_workflow_and_version(conn, workflow_id, from_version)
+    ver_to = await ver_repo.get_by_workflow_and_version(conn, workflow_id, to_version)
+
+    if ver_from is None:
+        raise HTTPException(status_code=404, detail=f"Version {from_version} not found")
+    if ver_to is None:
+        raise HTTPException(status_code=404, detail=f"Version {to_version} not found")
+
+    def_from = ver_from["definition"]
+    def_to = ver_to["definition"]
+
+    # Compare nodes
+    nodes_from = {n["id"] for n in def_from.get("nodes", [])}
+    nodes_to = {n["id"] for n in def_to.get("nodes", [])}
+
+    # Detect modified nodes (same id, different config)
+    node_map_from = {n["id"]: n for n in def_from.get("nodes", [])}
+    node_map_to = {n["id"]: n for n in def_to.get("nodes", [])}
+    common = nodes_from & nodes_to
+    modified = [nid for nid in common if node_map_from[nid] != node_map_to[nid]]
+
+    # Compare edges
+    edges_from = {(e["source"], e["target"]) for e in def_from.get("edges", [])}
+    edges_to = {(e["source"], e["target"]) for e in def_to.get("edges", [])}
+
+    return {
+        "workflow_id": workflow_id,
+        "from_version": from_version,
+        "to_version": to_version,
+        "nodes_added": sorted(nodes_to - nodes_from),
+        "nodes_removed": sorted(nodes_from - nodes_to),
+        "nodes_modified": sorted(modified),
+        "edges_added": len(edges_to - edges_from),
+        "edges_removed": len(edges_from - edges_to),
+    }

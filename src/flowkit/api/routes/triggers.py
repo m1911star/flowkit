@@ -15,6 +15,7 @@ from flowkit.api.deps import (
     get_webhook_repo,
     get_workflow_repo,
 )
+from flowkit.api.schemas.errors import ErrorResponse
 from flowkit.api.schemas.triggers import (
     CreateWebhookRequest,
     WebhookFireResponse,
@@ -53,7 +54,11 @@ async def create_webhook_trigger(
     )
 
 
-@router.post("/triggers/webhook/{key}", response_model=WebhookFireResponse)
+@router.post(
+    "/triggers/webhook/{key}",
+    response_model=WebhookFireResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 async def fire_webhook(
     key: str,
     conn: Annotated[AsyncConnection, Depends(get_db_connection)],

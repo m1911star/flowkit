@@ -72,6 +72,7 @@ class SchedulePoller:
         self._version_repo = version_repo
         self._run_repo = run_repo
         self.poll_interval = poll_interval
+        self._shutdown_event = asyncio.Event()
 
     async def poll_once(self, conn: AsyncConnection) -> list[uuid.UUID]:
         """Check for due triggers and create runs.
@@ -96,19 +97,30 @@ class SchedulePoller:
         return created_run_ids
 
     async def run_loop(self, conn: AsyncConnection) -> None:
-        """Run the polling loop indefinitely.
+        """Run the polling loop until shutdown is requested.
 
         Calls :meth:`poll_once` every ``poll_interval`` seconds. Exceptions
         from individual polls are logged and swallowed so the loop continues.
         """
-        while True:
+        while not self._shutdown_event.is_set():
             try:
                 run_ids = await self.poll_once(conn)
                 if run_ids:
                     logger.info("Scheduler created %d run(s): %s", len(run_ids), run_ids)
             except Exception:
                 logger.exception("Scheduler poll error")
-            await asyncio.sleep(self.poll_interval)
+            try:
+                await asyncio.wait_for(
+                    self._shutdown_event.wait(), timeout=self.poll_interval
+                )
+                break  # Event was set, shutdown requested
+            except TimeoutError:
+                pass  # Normal timeout, continue polling
+
+    def shutdown(self) -> None:
+        """Signal the poller to stop after the current poll completes."""
+        logger.info("Scheduler shutdown requested")
+        self._shutdown_event.set()
 
     # ---- internal --------------------------------------------------------- #
 

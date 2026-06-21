@@ -16,6 +16,7 @@ from flowkit.api.deps import (
     get_version_repo,
     get_workflow_repo,
 )
+from flowkit.api.schemas.errors import ErrorResponse
 from flowkit.api.schemas.runs import (
     NodeRunResponse,
     ResumeRunRequest,
@@ -66,7 +67,7 @@ async def start_run(
     return run
 
 
-@router.get("/{run_id}", response_model=RunResponse)
+@router.get("/{run_id}", response_model=RunResponse, responses={404: {"model": ErrorResponse}})
 async def get_run(
     run_id: UUID,
     conn: Annotated[AsyncConnection, Depends(get_db_connection)],
@@ -78,7 +79,11 @@ async def get_run(
     return run
 
 
-@router.post("/{run_id}/resume", response_model=RunResponse)
+@router.post(
+    "/{run_id}/resume",
+    response_model=RunResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 async def resume_run(
     run_id: UUID,
     body: ResumeRunRequest,
@@ -107,7 +112,11 @@ async def resume_run(
     return await run_repo.get(conn, run_id) or run
 
 
-@router.post("/{run_id}/cancel", response_model=RunResponse)
+@router.post(
+    "/{run_id}/cancel",
+    response_model=RunResponse,
+    responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+)
 async def cancel_run(
     run_id: UUID,
     conn: Annotated[AsyncConnection, Depends(get_db_connection)],

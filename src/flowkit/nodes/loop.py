@@ -34,6 +34,13 @@ class LoopExecutor(NodeExecutor):
                 error=f"Loop items must be a list, got {type(items).__name__}",
             )
 
+        if len(items) > config.max_iterations:
+            return NodeResult(
+                status=NodeState.FAILED,
+                outputs={},
+                error=f"Loop items ({len(items)}) exceeds max_iterations ({config.max_iterations})",
+            )
+
         if len(items) == 0:
             return NodeResult(
                 status=NodeState.COMPLETED,

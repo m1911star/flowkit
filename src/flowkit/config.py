@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
+    # Authentication
+    api_key: str = ""
+
     # Worker
     worker_concurrency: int = 10
 

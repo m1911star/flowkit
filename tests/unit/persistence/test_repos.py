@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from flowkit.persistence.repos import (
+    DeadLetterRepo,
     NodeRunRepo,
     RunEventRepo,
     ScheduleTriggerRepo,
@@ -539,3 +540,88 @@ class TestScheduleTriggerRepo:
             next_fire_at=next_fire,
         )
         assert updated is True
+
+
+# --------------------------------------------------------------------------- #
+# DeadLetterRepo
+# --------------------------------------------------------------------------- #
+class TestDeadLetterRepo:
+    @pytest.fixture
+    def repo(self) -> DeadLetterRepo:
+        return DeadLetterRepo()
+
+    @pytest.fixture
+    async def run_id(self, conn: AsyncConnection) -> uuid.UUID:
+        """Create a workflow + version + run for FK constraint."""
+        wf_repo = WorkflowRepo()
+        wf = await wf_repo.create(conn, name="test-wf")
+        ver_repo = WorkflowVersionRepo()
+        ver = await ver_repo.create(
+            conn, workflow_id=wf["id"], version=1, definition={"version": "1.0"}, checksum="abc123"
+        )
+        run_repo = WorkflowRunRepo()
+        run = await run_repo.create(
+            conn, workflow_id=wf["id"], workflow_version_id=ver["id"]
+        )
+        return run["id"]
+
+    async def test_create_and_get_pending(
+        self, repo: DeadLetterRepo, conn: AsyncConnection, run_id: uuid.UUID
+    ) -> None:
+        entry = await repo.create(
+            conn, workflow_run_id=run_id, error="Node 'http_call' failed: timeout"
+        )
+        assert entry["workflow_run_id"] == run_id
+        assert entry["status"] == "pending"
+        assert entry["attempt"] == 1
+        assert entry["max_retries"] == 3
+
+        pending = await repo.get_pending(conn)
+        assert len(pending) == 1
+        assert pending[0]["id"] == entry["id"]
+
+    async def test_mark_retried_increments_attempt(
+        self, repo: DeadLetterRepo, conn: AsyncConnection, run_id: uuid.UUID
+    ) -> None:
+        entry = await repo.create(
+            conn, workflow_run_id=run_id, error="connection reset", max_retries=3
+        )
+        updated = await repo.mark_retried(conn, entry["id"], attempt=2)
+        assert updated is True
+
+        pending = await repo.get_pending(conn)
+        assert len(pending) == 1
+        assert pending[0]["attempt"] == 2
+
+    async def test_mark_retried_exhausted(
+        self, repo: DeadLetterRepo, conn: AsyncConnection, run_id: uuid.UUID
+    ) -> None:
+        entry = await repo.create(
+            conn, workflow_run_id=run_id, error="persistent failure", max_retries=2
+        )
+        # attempt == max_retries → exhausted
+        updated = await repo.mark_retried(conn, entry["id"], attempt=2)
+        assert updated is True
+
+        pending = await repo.get_pending(conn)
+        assert len(pending) == 0  # No longer pending
+
+    async def test_mark_resolved(
+        self, repo: DeadLetterRepo, conn: AsyncConnection, run_id: uuid.UUID
+    ) -> None:
+        entry = await repo.create(
+            conn, workflow_run_id=run_id, error="transient error"
+        )
+        resolved = await repo.mark_resolved(conn, entry["id"])
+        assert resolved is True
+
+        pending = await repo.get_pending(conn)
+        assert len(pending) == 0
+
+    async def test_create_with_node_id(
+        self, repo: DeadLetterRepo, conn: AsyncConnection, run_id: uuid.UUID
+    ) -> None:
+        entry = await repo.create(
+            conn, workflow_run_id=run_id, error="code node timeout", node_id="code_1"
+        )
+        assert entry["node_id"] == "code_1"

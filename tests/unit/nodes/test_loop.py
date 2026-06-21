@@ -84,3 +84,43 @@ class TestLoopExecutor:
 
         assert result.status == NodeState.FAILED
         assert result.error is not None
+
+    async def test_exceeds_max_iterations(self):
+        pool = VariablePool()
+        pool.set_node_outputs("fetch", {"orders": list(range(101))})
+
+        ctx = _make_ctx("{{nodes.fetch.output.orders}}", pool)
+
+        executor = LoopExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert result.error is not None
+        assert "101" in result.error
+        assert "100" in result.error
+
+    async def test_max_iterations_at_boundary(self):
+        pool = VariablePool()
+        pool.set_node_outputs("fetch", {"orders": list(range(100))})
+
+        ctx = _make_ctx("{{nodes.fetch.output.orders}}", pool)
+
+        executor = LoopExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.COMPLETED
+        assert result.next_handle == "body"
+
+    async def test_custom_max_iterations(self):
+        pool = VariablePool()
+        pool.set_node_outputs("fetch", {"orders": list(range(6))})
+
+        ctx = _make_ctx("{{nodes.fetch.output.orders}}", pool, max_iterations=5)
+
+        executor = LoopExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert result.error is not None
+        assert "6" in result.error
+        assert "5" in result.error

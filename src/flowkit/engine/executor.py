@@ -5,7 +5,9 @@ Build graph → find ready nodes → execute each → dispatch results → repea
 
 from __future__ import annotations
 
+import logging
 import uuid
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from flowkit.engine.dispatcher import Dispatcher
@@ -20,6 +22,20 @@ if TYPE_CHECKING:
 
 _MAX_ITERATIONS = 1000
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class WorkflowResult:
+    """Structured result of a workflow execution."""
+
+    status: RunState
+    run_id: uuid.UUID
+    outputs: dict[str, Any]
+    events: list[dict[str, Any]]
+    waiting_node: str | None = None
+    error: str | None = None
+
 
 class WorkflowExecutor:
     """Run a workflow definition to completion (or pause/failure)."""
@@ -28,8 +44,9 @@ class WorkflowExecutor:
         self,
         definition: WorkflowDefinition,
         inputs: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> WorkflowResult:
         run_id = uuid.uuid4()
+        logger.info("Workflow execution started, run_id=%s", run_id)
         graph = Graph(definition)
         pool = VariablePool(workflow_inputs=inputs)
         dispatcher = Dispatcher(graph, pool)
@@ -55,41 +72,47 @@ class WorkflowExecutor:
                 )
 
                 result = await executor.execute(ctx)
+                logger.debug("Node %s executed, status=%s", node_id, result.status.value)
                 _ = dispatcher.on_node_complete(node_id, result)
 
                 if result.status == NodeState.COMPLETED:
                     events.append({"type": "node_completed", "node_id": node_id})
                 elif result.status == NodeState.WAITING:
                     events.append({"type": "node_waiting", "node_id": node_id})
-                    return {
-                        "status": RunState.PAUSED,
-                        "run_id": run_id,
-                        "outputs": {},
-                        "events": events,
-                        "waiting_node": node_id,
-                        "error": None,
-                    }
+                    logger.info("Workflow paused, run_id=%s", run_id)
+                    return WorkflowResult(
+                        status=RunState.PAUSED,
+                        run_id=run_id,
+                        outputs={},
+                        events=events,
+                        waiting_node=node_id,
+                        error=None,
+                    )
                 elif result.status == NodeState.FAILED:
                     events.append({"type": "node_failed", "node_id": node_id})
-                    return {
-                        "status": RunState.FAILED,
-                        "run_id": run_id,
-                        "outputs": {},
-                        "events": events,
-                        "waiting_node": None,
-                        "error": f"Node '{node_id}' failed: {result.error}",
-                    }
+                    logger.info(
+                        "Workflow failed, run_id=%s, node=%s", run_id, node_id
+                    )
+                    return WorkflowResult(
+                        status=RunState.FAILED,
+                        run_id=run_id,
+                        outputs={},
+                        events=events,
+                        waiting_node=None,
+                        error=f"Node '{node_id}' failed: {result.error}",
+                    )
 
         end_node = graph.get_end_node()
         end_outputs = (
             pool.get_node_outputs(end_node.id) if end_node.id in dispatcher.completed_nodes else {}
         )
 
-        return {
-            "status": RunState.COMPLETED,
-            "run_id": run_id,
-            "outputs": end_outputs,
-            "events": events,
-            "waiting_node": None,
-            "error": None,
-        }
+        logger.info("Workflow completed, run_id=%s", run_id)
+        return WorkflowResult(
+            status=RunState.COMPLETED,
+            run_id=run_id,
+            outputs=end_outputs,
+            events=events,
+            waiting_node=None,
+            error=None,
+        )

@@ -201,3 +201,29 @@ schedule_triggers = sa.Table(
     ),
     sa.Index("ix_schedule_triggers_next_fire_at", "next_fire_at"),
 )
+
+# --------------------------------------------------------------------------- #
+# dead_letter_queue
+# --------------------------------------------------------------------------- #
+dead_letter_queue = sa.Table(
+    "dead_letter_queue",
+    metadata,
+    sa.Column("id", sa.Uuid, primary_key=True),
+    sa.Column(
+        "workflow_run_id",
+        sa.Uuid,
+        sa.ForeignKey("workflow_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("error", sa.Text, nullable=False),
+    sa.Column("node_id", sa.String(100), nullable=True),
+    sa.Column("attempt", sa.Integer, nullable=False, server_default=sa.text("1")),
+    sa.Column("max_retries", sa.Integer, nullable=False, server_default=sa.text("3")),
+    sa.Column("status", sa.String(20), nullable=False, server_default=sa.text("'pending'")),
+    sa.Column("retried_at", sa.DateTime(timezone=True), nullable=True),
+    sa.Column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
+    sa.Index("ix_dead_letter_queue_status", "status"),
+    sa.Index("ix_dead_letter_queue_workflow_run_id", "workflow_run_id"),
+)

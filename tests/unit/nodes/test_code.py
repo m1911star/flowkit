@@ -1,6 +1,6 @@
 """Tests for flowkit.nodes.code — CodeExecutor."""
-
 import uuid
+from unittest.mock import MagicMock, patch
 
 from flowkit.definition.schema import NodeDef, NodeType
 from flowkit.nodes.base import NodeContext
@@ -98,3 +98,75 @@ class TestCodeExecutor:
 
         assert result.status == NodeState.COMPLETED
         assert result.outputs == {"total": 15, "count": 5}
+
+
+class TestCodeSandboxHardening:
+    """Tests for AST pre-validation, timeout, and size limits."""
+
+    async def test_rejects_import_statement(self):
+        ctx = _make_ctx(source="import os")
+        executor = CodeExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert "Forbidden: import statement" in result.error
+
+    async def test_rejects_import_from(self):
+        ctx = _make_ctx(source="from os import path")
+        executor = CodeExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert "Forbidden: from-import statement" in result.error
+
+    async def test_rejects_dunder_access(self):
+        ctx = _make_ctx(source="x = ().__class__.__subclasses__()")
+        executor = CodeExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert "Forbidden: access to private/dunder attribute" in result.error
+
+    async def test_rejects_eval_call(self):
+        ctx = _make_ctx(source="eval('1+1')")
+        executor = CodeExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert "Forbidden: call to 'eval'" in result.error
+
+    async def test_rejects_exec_call(self):
+        ctx = _make_ctx(source="exec('x=1')")
+        executor = CodeExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert "Forbidden: call to 'exec'" in result.error
+
+    async def test_timeout_kills_execution(self):
+        # Simulate timeout by mocking thread.join to not finish and is_alive to return True
+        ctx = _make_ctx(source="result = {'x': 1}")
+        executor = CodeExecutor()
+
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = True  # Simulate never-finishing thread
+
+        with (
+            patch("flowkit.nodes.code.threading.Thread", return_value=mock_thread),
+            patch("flowkit.nodes.code._DEFAULT_TIMEOUT", 0.1),
+        ):
+            result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert "timed out" in result.error
+        mock_thread.start.assert_called_once()
+        mock_thread.join.assert_called_once()
+
+    async def test_rejects_oversized_source(self):
+        source = "x = 1\n" * 10_000  # Well over 50_000 chars
+        ctx = _make_ctx(source=source)
+        executor = CodeExecutor()
+        result = await executor.execute(ctx)
+
+        assert result.status == NodeState.FAILED
+        assert "Source too large" in result.error

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 
 from flowkit.persistence.models import (
+    dead_letter_queue,
     node_runs,
     run_events,
     schedule_triggers,
@@ -200,6 +201,20 @@ class WorkflowVersionRepo:
             .values(is_published=True)
         )
         return result.rowcount > 0
+
+    async def unpublish_all(self, conn: AsyncConnection, workflow_id: uuid.UUID) -> int:
+        """Unpublish all versions for a workflow. Returns count of affected rows."""
+        result = await conn.execute(
+            workflow_versions.update()
+            .where(
+                sa.and_(
+                    workflow_versions.c.workflow_id == workflow_id,
+                    workflow_versions.c.is_published == True,  # noqa: E712
+                )
+            )
+            .values(is_published=False)
+        )
+        return result.rowcount
 
 
 # --------------------------------------------------------------------------- #
@@ -567,5 +582,99 @@ class ScheduleTriggerRepo:
                 next_fire_at=next_fire_at,
                 updated_at=_now(),
             )
+        )
+        return result.rowcount > 0
+
+
+# --------------------------------------------------------------------------- #
+# DeadLetterRepo
+# --------------------------------------------------------------------------- #
+class DeadLetterRepo:
+    """CRUD for the dead_letter_queue table."""
+
+    async def create(
+        self,
+        conn: AsyncConnection,
+        *,
+        workflow_run_id: uuid.UUID,
+        error: str,
+        node_id: str | None = None,
+        max_retries: int = 3,
+    ) -> dict[str, Any]:
+        row_id = uuid.uuid4()
+        now = _now()
+        await conn.execute(
+            dead_letter_queue.insert().values(
+                id=row_id,
+                workflow_run_id=workflow_run_id,
+                error=error,
+                node_id=node_id,
+                attempt=1,
+                max_retries=max_retries,
+                status="pending",
+                created_at=now,
+            )
+        )
+        return {
+            "id": row_id,
+            "workflow_run_id": workflow_run_id,
+            "error": error,
+            "node_id": node_id,
+            "attempt": 1,
+            "max_retries": max_retries,
+            "status": "pending",
+            "created_at": now,
+        }
+
+    async def get_pending(
+        self,
+        conn: AsyncConnection,
+        *,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Get pending dead-letter entries eligible for retry."""
+        result = await conn.execute(
+            dead_letter_queue.select()
+            .where(dead_letter_queue.c.status == "pending")
+            .order_by(dead_letter_queue.c.created_at.asc())
+            .limit(limit)
+        )
+        return [dict(r) for r in result.mappings().all()]
+
+    async def mark_retried(
+        self,
+        conn: AsyncConnection,
+        dlq_id: uuid.UUID,
+        *,
+        attempt: int,
+    ) -> bool:
+        """Mark entry as retried; if attempt >= max_retries, mark as exhausted."""
+        now = _now()
+        # Get entry to check max_retries
+        result = await conn.execute(
+            dead_letter_queue.select().where(dead_letter_queue.c.id == dlq_id)
+        )
+        row = result.mappings().first()
+        if row is None:
+            return False
+
+        new_status = "exhausted" if attempt >= row["max_retries"] else "pending"
+        update_result = await conn.execute(
+            dead_letter_queue.update()
+            .where(dead_letter_queue.c.id == dlq_id)
+            .values(attempt=attempt, status=new_status, retried_at=now)
+        )
+        return update_result.rowcount > 0
+
+    async def mark_resolved(
+        self,
+        conn: AsyncConnection,
+        dlq_id: uuid.UUID,
+    ) -> bool:
+        """Mark entry as resolved (successful retry)."""
+        result = await conn.execute(
+            dead_letter_queue.update()
+            .where(dead_letter_queue.c.id == dlq_id)
+            .values(status="resolved", retried_at=_now())
         )
         return result.rowcount > 0

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import ast
+import logging
+import threading
 from typing import Any
 
 from flowkit.definition.schema import CodeNodeConfig
 from flowkit.nodes.base import NodeContext, NodeExecutor, NodeResult
 from flowkit.runtime.state import NodeState
+
+logger = logging.getLogger(__name__)
 
 # Restricted builtins — no file/network/import access
 _SAFE_BUILTINS = {
@@ -62,6 +67,12 @@ _SAFE_BUILTINS = {
 }
 
 _DEFAULT_TIMEOUT = 30
+_MAX_SOURCE_LENGTH = 50_000
+
+# Function names that are forbidden even if they appear in builtins or scope
+_FORBIDDEN_CALLS: frozenset[str] = frozenset(
+    {"eval", "exec", "compile", "globals", "locals", "vars", "dir", "delattr", "setattr"}
+)
 
 
 class CodeExecutor(NodeExecutor):
@@ -76,6 +87,25 @@ class CodeExecutor(NodeExecutor):
                 error="Invalid or missing code node config",
             )
 
+        # --- Guard: source length ---
+        if len(config.source) > _MAX_SOURCE_LENGTH:
+            return NodeResult(
+                status=NodeState.FAILED,
+                outputs={},
+                error=f"Source too large ({len(config.source)} chars, max {_MAX_SOURCE_LENGTH})",
+            )
+
+        # --- Guard: AST pre-validation ---
+        logger.debug("Code execution started for node %s", ctx.node_def.id)
+        validation_error = _validate_ast(config.source)
+        if validation_error is not None:
+            logger.warning("AST validation failed: %s", validation_error)
+            return NodeResult(
+                status=NodeState.FAILED,
+                outputs={},
+                error=validation_error,
+            )
+
         pool = ctx.variable_pool
 
         # Resolve input variables
@@ -87,13 +117,44 @@ class CodeExecutor(NodeExecutor):
         scope: dict[str, Any] = {"__builtins__": _SAFE_BUILTINS}
         scope.update(resolved_inputs)
 
+        timeout = _DEFAULT_TIMEOUT
+
         try:
-            exec(config.source, scope)  # noqa: S102
-        except Exception as exc:
+            compiled = compile(config.source, "<sandbox>", "exec")
+        except SyntaxError as exc:
             return NodeResult(
                 status=NodeState.FAILED,
                 outputs={},
-                error=f"{type(exc).__name__}: {exc}",
+                error=f"SyntaxError: {exc}",
+            )
+
+        # Run in a daemon thread so it doesn't block process exit on timeout
+        error_box: list[Exception] = []
+
+        def _run() -> None:
+            try:
+                exec(compiled, scope)  # noqa: S102
+            except Exception as exc:
+                error_box.append(exc)
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout)
+
+        if thread.is_alive():
+            logger.warning("Code execution timed out after %ds", timeout)
+            return NodeResult(
+                status=NodeState.FAILED,
+                outputs={},
+                error=f"Execution timed out after {timeout}s",
+            )
+
+        if error_box:
+            err = error_box[0]
+            return NodeResult(
+                status=NodeState.FAILED,
+                outputs={},
+                error=f"{type(err).__name__}: {err}",
             )
 
         # Extract result from scope
@@ -101,3 +162,31 @@ class CodeExecutor(NodeExecutor):
         outputs = result_value if isinstance(result_value, dict) else {}
 
         return NodeResult(status=NodeState.COMPLETED, outputs=outputs)
+
+
+def _validate_ast(source: str) -> str | None:
+    """Parse and walk the AST, returning an error message if dangerous nodes are found."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        return f"SyntaxError: {exc}"
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names = ", ".join(alias.name for alias in node.names)
+            return f"Forbidden: import statement ({names})"
+
+        if isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            return f"Forbidden: from-import statement ({module})"
+
+        if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
+            return f"Forbidden: access to private/dunder attribute '{node.attr}'"
+
+        if isinstance(node, ast.Call):
+            func = node.func
+            # Direct name call: eval(...), exec(...)
+            if isinstance(func, ast.Name) and func.id in _FORBIDDEN_CALLS:
+                return f"Forbidden: call to '{func.id}'"
+
+    return None

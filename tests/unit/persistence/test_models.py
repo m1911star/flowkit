@@ -24,6 +24,7 @@ def test_metadata_has_all_tables() -> None:
         "run_events",
         "webhook_triggers",
         "schedule_triggers",
+        "dead_letter_queue",
     }
     assert table_names == expected
 

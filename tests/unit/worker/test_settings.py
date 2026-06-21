@@ -31,3 +31,15 @@ def test_worker_settings_has_job_timeout():
     assert hasattr(WorkerSettings, "job_timeout")
     assert isinstance(WorkerSettings.job_timeout, int)
     assert WorkerSettings.job_timeout == 3600
+
+
+def test_worker_settings_has_on_startup() -> None:
+    """Test that WorkerSettings has on_startup hook and it is callable."""
+    assert hasattr(WorkerSettings, "on_startup")
+    assert callable(WorkerSettings.on_startup)
+
+
+def test_worker_settings_has_on_shutdown() -> None:
+    """Test that WorkerSettings has on_shutdown hook and it is callable."""
+    assert hasattr(WorkerSettings, "on_shutdown")
+    assert callable(WorkerSettings.on_shutdown)

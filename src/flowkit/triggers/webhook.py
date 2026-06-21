@@ -6,7 +6,10 @@ and creates a new workflow run.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
+
+from flowkit.errors import NotFoundError, WebhookError
 
 if TYPE_CHECKING:
     import uuid
@@ -20,24 +23,26 @@ if TYPE_CHECKING:
         WorkflowVersionRepo,
     )
 
+logger = logging.getLogger(__name__)
+
 
 # --------------------------------------------------------------------------- #
 # Exceptions
 # --------------------------------------------------------------------------- #
-class WebhookNotFoundError(Exception):
+class WebhookNotFoundError(NotFoundError):
     """Raised when no webhook trigger matches the given key."""
 
     def __init__(self, key: str) -> None:
         self.key = key
-        super().__init__(f"Webhook trigger not found for key: {key}")
+        super().__init__("Webhook trigger", key)
 
 
-class WebhookInactiveError(Exception):
+class WebhookInactiveError(WebhookError):
     """Raised when the matching webhook trigger is deactivated."""
 
     def __init__(self, key: str) -> None:
         self.key = key
-        super().__init__(f"Webhook trigger is inactive for key: {key}")
+        super().__init__(f"Webhook trigger is inactive for key: {key}", key=key)
 
 
 # --------------------------------------------------------------------------- #
@@ -77,10 +82,12 @@ class WebhookHandler:
         # 1. Lookup trigger
         trigger = await self._webhook_repo.get_by_key(conn, key)
         if trigger is None:
+            logger.warning("Webhook not found for key=%s", key)
             raise WebhookNotFoundError(key)
 
         # 2. Check active
         if not trigger["is_active"]:
+            logger.warning("Webhook inactive for key=%s", key)
             raise WebhookInactiveError(key)
 
         workflow_id: uuid.UUID = trigger["workflow_id"]
@@ -90,7 +97,7 @@ class WebhookHandler:
         if version is None:
             version = await self._version_repo.get_latest(conn, workflow_id)
         if version is None:
-            raise ValueError(f"No workflow version found for workflow {workflow_id}")
+            raise NotFoundError("Workflow version", str(workflow_id))
 
         # 4. Apply input mapping
         inputs = _apply_input_mapping(
@@ -108,6 +115,7 @@ class WebhookHandler:
             trigger_id=trigger["id"],
         )
 
+        logger.info("Webhook fired, key=%s, run_id=%s", key, run["id"])
         return {
             "run_id": run["id"],
             "workflow_id": workflow_id,

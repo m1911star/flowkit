@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from flowkit.definition.schema import (
     EdgeDef,
@@ -82,7 +82,7 @@ class TestWorkflowExecutorLinear:
             _linear_workflow(),
             inputs={"a": 3, "b": 7},
         )
-        assert result["status"] == RunState.COMPLETED
+        assert result.status == RunState.COMPLETED
 
     async def test_linear_workflow_returns_outputs(self) -> None:
         executor = WorkflowExecutor()
@@ -90,7 +90,7 @@ class TestWorkflowExecutorLinear:
             _linear_workflow(),
             inputs={"a": 3, "b": 7},
         )
-        assert result["outputs"]["total"] == 10
+        assert result.outputs["total"] == 10
 
     async def test_linear_workflow_records_events(self) -> None:
         executor = WorkflowExecutor()
@@ -98,7 +98,7 @@ class TestWorkflowExecutorLinear:
             _linear_workflow(),
             inputs={"a": 1, "b": 2},
         )
-        events = result["events"]
+        events = result.events
         node_ids = [e["node_id"] for e in events if e["type"] == "node_completed"]
         assert "start" in node_ids
         assert "add" in node_ids
@@ -169,8 +169,8 @@ class TestWorkflowExecutorBranching:
             _branching_workflow(),
             inputs={"x": 20},
         )
-        assert result["status"] == RunState.COMPLETED
-        events = result["events"]
+        assert result.status == RunState.COMPLETED
+        events = result.events
         completed_ids = {e["node_id"] for e in events if e["type"] == "node_completed"}
         assert "code_true" in completed_ids
         assert "code_false" not in completed_ids
@@ -181,8 +181,8 @@ class TestWorkflowExecutorBranching:
             _branching_workflow(),
             inputs={"x": 5},
         )
-        assert result["status"] == RunState.COMPLETED
-        events = result["events"]
+        assert result.status == RunState.COMPLETED
+        events = result.events
         completed_ids = {e["node_id"] for e in events if e["type"] == "node_completed"}
         assert "code_false" in completed_ids
         assert "code_true" not in completed_ids
@@ -227,8 +227,8 @@ class TestWorkflowExecutorPause:
             _human_input_workflow(),
             inputs={},
         )
-        assert result["status"] == RunState.PAUSED
-        assert result["waiting_node"] == "human"
+        assert result.status == RunState.PAUSED
+        assert result.waiting_node == "human"
 
     async def test_paused_workflow_events(self) -> None:
         executor = WorkflowExecutor()
@@ -236,7 +236,7 @@ class TestWorkflowExecutorPause:
             _human_input_workflow(),
             inputs={},
         )
-        events = result["events"]
+        events = result.events
         completed_ids = {e["node_id"] for e in events if e["type"] == "node_completed"}
         assert "start" in completed_ids
         waiting_ids = {e["node_id"] for e in events if e["type"] == "node_waiting"}
@@ -283,8 +283,8 @@ class TestWorkflowExecutorErrors:
             _failing_workflow(),
             inputs={},
         )
-        assert result["status"] == RunState.FAILED
-        assert result["error"] is not None
+        assert result.status == RunState.FAILED
+        assert result.error is not None
 
     async def test_failed_workflow_captures_error_info(self) -> None:
         executor = WorkflowExecutor()
@@ -292,7 +292,7 @@ class TestWorkflowExecutorErrors:
             _failing_workflow(),
             inputs={},
         )
-        assert "bad_code" in result["error"]
+        assert "bad_code" in result.error
 
 
 # ---------------------------------------------------------------------------
@@ -334,11 +334,12 @@ class TestWorkflowExecutorHttp:
     """HTTP node execution with mocked httpx."""
 
     async def test_http_workflow_completes(self) -> None:
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.headers = {"content-type": "application/json"}
         mock_response.json.return_value = {"data": "hello"}
-        mock_response.raise_for_status = AsyncMock()
+        mock_response.content = b'{"data": "hello"}'
+        mock_response.text = '{"data": "hello"}'
 
         mock_client_instance = AsyncMock()
         mock_client_instance.request.return_value = mock_response
@@ -351,5 +352,5 @@ class TestWorkflowExecutorHttp:
                 _http_workflow(),
                 inputs={},
             )
-            assert result["status"] == RunState.COMPLETED
-            assert result["outputs"]["status"] == 200
+            assert result.status == RunState.COMPLETED
+            assert result.outputs["status"] == 200

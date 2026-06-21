@@ -13,6 +13,7 @@ Key responsibilities:
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from flowkit.runtime.state import NodeState
@@ -21,6 +22,9 @@ if TYPE_CHECKING:
     from flowkit.engine.graph import Graph
     from flowkit.nodes.base import NodeResult
     from flowkit.runtime.variable_pool import VariablePool
+
+
+logger = logging.getLogger(__name__)
 
 
 class Dispatcher:
@@ -76,6 +80,7 @@ class Dispatcher:
         # COMPLETED — mark done and record handle
         self._completed_nodes.add(node_id)
         self._node_handles[node_id] = result.next_handle
+        logger.debug("Node %s marked complete, handle=%s", node_id, result.next_handle)
 
         return self._find_newly_ready(node_id)
 
@@ -92,6 +97,7 @@ class Dispatcher:
             if self._is_node_ready(node_id):
                 ready.append(node_id)
 
+        logger.debug("Ready nodes computed: %s", ready)
         return ready
 
     # ------------------------------------------------------------------

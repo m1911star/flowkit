@@ -1,10 +1,13 @@
 """Async database engine and session management."""
 
+import logging
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from flowkit.config import Settings
+
+logger = logging.getLogger(__name__)
 
 _engine: AsyncEngine | None = None
 
@@ -17,6 +20,8 @@ def get_engine(settings: Settings | None = None) -> AsyncEngine:
             from flowkit.config import get_settings
 
             settings = get_settings()
+        db_url = settings.database_url
+        url_display = db_url.split("@")[-1] if "@" in db_url else db_url
         _engine = create_async_engine(
             settings.database_url,
             pool_size=20,
@@ -24,6 +29,7 @@ def get_engine(settings: Settings | None = None) -> AsyncEngine:
             pool_pre_ping=True,
             echo=False,
         )
+        logger.info("Database engine created, target=%s", url_display)
     return _engine
 
 

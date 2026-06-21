@@ -68,3 +68,16 @@ class WorkflowListResponse(BaseModel):
 
     items: list[WorkflowResponse]
     total: int
+
+
+class VersionDiffResponse(BaseModel):
+    """Diff between two workflow versions."""
+
+    workflow_id: UUID
+    from_version: int
+    to_version: int
+    nodes_added: list[str]
+    nodes_removed: list[str]
+    nodes_modified: list[str]
+    edges_added: int
+    edges_removed: int

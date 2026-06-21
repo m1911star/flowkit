@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import random
 from typing import Any
 
 import httpx
@@ -11,6 +13,9 @@ import httpx
 from flowkit.definition.schema import HttpNodeConfig
 from flowkit.nodes.base import NodeContext, NodeExecutor, NodeResult
 from flowkit.runtime.state import NodeState
+
+logger = logging.getLogger(__name__)
+_MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 class HttpExecutor(NodeExecutor):
@@ -41,6 +46,7 @@ class HttpExecutor(NodeExecutor):
 
         for attempt in range(max_attempts):
             try:
+                logger.debug("HTTP request started: %s %s", config.method.value, url)
                 response = await self._do_request(
                     method=config.method.value,
                     url=url,
@@ -48,6 +54,17 @@ class HttpExecutor(NodeExecutor):
                     body=body,
                     timeout=timeout,
                 )
+                response.raise_for_status()
+                if len(response.content) > _MAX_RESPONSE_SIZE:
+                    return NodeResult(
+                        status=NodeState.FAILED,
+                        outputs={},
+                        error=(
+                            f"Response size {len(response.content)} bytes"
+                            f" exceeds limit of {_MAX_RESPONSE_SIZE} bytes"
+                        ),
+                    )
+                logger.debug("HTTP response received: status=%d", response.status_code)
                 return NodeResult(
                     status=NodeState.COMPLETED,
                     outputs=self._parse_response(response),
@@ -55,9 +72,15 @@ class HttpExecutor(NodeExecutor):
             except (TimeoutError, httpx.HTTPError) as exc:
                 last_error = str(exc)
                 if attempt < max_attempts - 1:
-                    # Simple backoff: fixed = no wait in tests, exponential = 2^attempt
+                    logger.warning(
+                        "HTTP retry attempt %d failed: %s", attempt + 1, last_error
+                    )
                     if config.retry and config.retry.backoff.value == "exponential":
-                        await asyncio.sleep(min(2**attempt, 30))
+                        base_delay = float(2**attempt)
+                    else:
+                        base_delay = 1.0
+                    delay = min(base_delay * (0.75 + random.random() * 0.5), 60.0)
+                    await asyncio.sleep(delay)
                     continue
 
         return NodeResult(

@@ -64,3 +64,6 @@ dev = [
     "greenlet>=3.3.2",
     "types-croniter>=6.0.0.20250809",
 ]
+
+[tool.coverage.run]
+concurrency = ["greenlet"]

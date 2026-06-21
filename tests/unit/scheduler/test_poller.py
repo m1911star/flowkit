@@ -229,3 +229,33 @@ class TestSchedulePoller:
 
         run_ids = await poller.poll_once(conn)
         assert len(run_ids) == 2
+
+
+# --------------------------------------------------------------------------- #
+# Graceful shutdown tests
+# --------------------------------------------------------------------------- #
+
+
+class TestSchedulePollerShutdown:
+    async def test_shutdown_method_sets_event(
+        self,
+        poller: SchedulePoller,
+    ) -> None:
+        """Calling shutdown() sets the internal _shutdown_event."""
+        assert not poller._shutdown_event.is_set()
+        poller.shutdown()
+        assert poller._shutdown_event.is_set()
+
+    async def test_shutdown_stops_loop(
+        self,
+        poller: SchedulePoller,
+        conn: AsyncConnection,
+    ) -> None:
+        """Setting the shutdown event causes run_loop to exit promptly."""
+        import asyncio
+
+        # Set shutdown immediately so the loop exits on first sleep
+        poller._shutdown_event.set()
+
+        # run_loop should complete quickly (not hang forever)
+        await asyncio.wait_for(poller.run_loop(conn), timeout=2.0)
