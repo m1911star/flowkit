@@ -5,14 +5,17 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from flowkit.api.schemas.errors import ErrorResponse
 from flowkit.errors import FlowkitError
 from flowkit.persistence.database import dispose_engine, get_engine
+from flowkit.streaming.ws import manager as ws_manager
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -83,5 +86,34 @@ def create_app() -> FastAPI:
                 }
             },
         )
+
+    # WebSocket streaming endpoint
+
+    @app.websocket("/ws/runs/{run_id}")
+    async def ws_run_events(websocket: WebSocket, run_id: UUID) -> None:
+        """WebSocket endpoint for streaming run events + receiving commands."""
+        await ws_manager.connect(run_id, websocket)
+        try:
+            while True:
+                data = await websocket.receive_json()
+                action = data.get("action")
+                if action == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif action == "cancel":
+                    await websocket.send_json(
+                        {"type": "ack", "action": "cancel", "run_id": str(run_id)}
+                    )
+                elif action == "resume":
+                    await websocket.send_json(
+                        {"type": "ack", "action": "resume", "run_id": str(run_id)}
+                    )
+                else:
+                    await websocket.send_json(
+                        {"type": "error", "message": f"Unknown action: {action}"}
+                    )
+        except WebSocketDisconnect:
+            ws_manager.disconnect(run_id, websocket)
+        except Exception:
+            ws_manager.disconnect(run_id, websocket)
 
     return app

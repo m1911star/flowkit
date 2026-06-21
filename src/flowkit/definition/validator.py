@@ -24,6 +24,7 @@ from flowkit.definition.schema import (
     IfElseConfig,
     NodeDef,
     NodeType,
+    SubWorkflowConfig,
     WorkflowDefinition,
 )
 
@@ -65,6 +66,8 @@ _VALID_SOURCE_HANDLES: dict[NodeType, set[str] | None] = {
     NodeType.if_else: None,  # dynamic: condition ids + "else"
     NodeType.loop: {"body", "completed"},
     NodeType.human_input: {"default"},
+    NodeType.parallel: {"default"},
+    NodeType.sub_workflow: {"default"},
 }
 
 
@@ -718,6 +721,22 @@ def validate(definition: WorkflowDefinition) -> list[ValidationError]:
                     ValidationError(
                         code="V-032",
                         message=f"code node '{node.id}' has invalid config: {exc}",
+                        node_id=node.id,
+                    )
+                )
+
+    # -----------------------------------------------------------------------
+    # V-033: sub_workflow node config validation
+    # -----------------------------------------------------------------------
+    for node in definition.nodes:
+        if node.type == NodeType.sub_workflow and node.config:
+            try:
+                SubWorkflowConfig.model_validate(node.config)
+            except Exception as exc:
+                errors.append(
+                    ValidationError(
+                        code="V-033",
+                        message=f"sub_workflow node '{node.id}' has invalid config: {exc}",
                         node_id=node.id,
                     )
                 )

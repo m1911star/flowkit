@@ -1509,6 +1509,64 @@ class TestV032CodeConfigValidation:
         assert "V-032" in _codes(errors)
 
 
+
+# ===========================================================================
+# V-033: sub_workflow node config schema validation
+# ===========================================================================
+
+
+class TestV033SubWorkflowConfigValidation:
+    def test_valid_sub_workflow_config(self):
+        wf = _wf(
+            nodes=[
+                NodeDef(id="start", type=NodeType.start),
+                NodeDef(
+                    id="child",
+                    type=NodeType.sub_workflow,
+                    config={
+                        "definition": {
+                            "version": "1.0",
+                            "metadata": {"name": "child-wf"},
+                            "nodes": [
+                                {"id": "start", "type": "start"},
+                                {"id": "end", "type": "end"},
+                            ],
+                            "edges": [{"id": "e1", "source": "start", "target": "end"}],
+                        },
+                    },
+                ),
+                NodeDef(id="end", type=NodeType.end),
+            ],
+            edges=[
+                EdgeDef(id="e1", source="start", target="child"),
+                EdgeDef(id="e2", source="child", target="end"),
+            ],
+        )
+        errors = validate(wf)
+        assert "V-033" not in _codes(errors)
+
+    def test_invalid_sub_workflow_config_extra_field(self):
+        wf = _wf(
+            nodes=[
+                NodeDef(id="start", type=NodeType.start),
+                NodeDef(
+                    id="child",
+                    type=NodeType.sub_workflow,
+                    config={
+                        "definition": {"version": "1.0"},
+                        "bogus_field": "not_allowed",
+                    },
+                ),
+                NodeDef(id="end", type=NodeType.end),
+            ],
+            edges=[
+                EdgeDef(id="e1", source="start", target="child"),
+                EdgeDef(id="e2", source="child", target="end"),
+            ],
+        )
+        errors = validate(wf)
+        assert "V-033" in _codes(errors)
+
 # ===========================================================================
 # Error Aggregation
 # ===========================================================================

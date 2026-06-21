@@ -18,6 +18,7 @@ from flowkit.nodes.sub_workflow import SubWorkflowExecutor
 
 class TestExecutorRegistry:
     def test_all_node_types_registered(self):
+        assert len(EXECUTOR_REGISTRY) == 9
         for node_type in NodeType:
             assert node_type in EXECUTOR_REGISTRY, f"{node_type} not in registry"
 
